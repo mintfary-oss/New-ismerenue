@@ -1,0 +1,51 @@
+# golangci-lint конфигурация для AQI Platform
+# Версия golangci-lint: v1.64 (v1 формат конфига)
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - gosimple
+    - ineffassign
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - gocritic
+    - gosec
+    - bodyclose
+    - contextcheck
+    - prealloc
+
+linters-settings:
+  govet:
+    enable-all: true
+  gosec:
+    excludes:
+      - G104   # необработанные ошибки (дублирует errcheck)
+  gocritic:
+    enabled-tags:
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint
+  misspell:
+    locale: US
+  goimports:
+    local-prefixes: github.com/mintfary/aqi-platform
+
+issues:
+  exclude-rules:
+    # В тестах разрешаем использовать t.Error без return
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+  max-issues-per-linter: 50
+  max-same-issues: 5
+
+run:
+  timeout: 5m
+  go: "1.23"

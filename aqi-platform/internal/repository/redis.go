@@ -113,3 +113,39 @@ func (t *LoginAttemptTracker) IsLocked(ctx context.Context, email string) (bool,
 func (t *LoginAttemptTracker) Reset(ctx context.Context, email string) error {
 	return t.client.Del(ctx, "login_attempts:"+email).Err()
 }
+
+// ── PasswordResetStore ────────────────────────────────────────────────────────
+
+// PasswordResetStore хранит токены сброса пароля в Redis.
+type PasswordResetStore struct {
+	client *redis.Client
+	ttl    time.Duration
+}
+
+// NewPasswordResetStore создаёт хранилище токенов сброса.
+func NewPasswordResetStore(client *redis.Client, ttl time.Duration) *PasswordResetStore {
+	if ttl <= 0 {
+		ttl = time.Hour // default: 1 час
+	}
+	return &PasswordResetStore{client: client, ttl: ttl}
+}
+
+// Set сохраняет токен сброса пароля для указанного email.
+func (s *PasswordResetStore) Set(ctx context.Context, token, email string) error {
+	key := "password_reset:" + token
+	return s.client.Set(ctx, key, email, s.ttl).Err()
+}
+
+// GetEmail возвращает email для токена сброса, и удаляет токен (one-time use).
+// Возвращает пустую строку если токен не найден или истёк.
+func (s *PasswordResetStore) GetEmail(ctx context.Context, token string) (string, error) {
+	key := "password_reset:" + token
+	email, err := s.client.GetDel(ctx, key).Result()
+	if err == redis.Nil {
+		return "", nil // токен не найден или истёк
+	}
+	if err != nil {
+		return "", fmt.Errorf("password reset get: %w", err)
+	}
+	return email, nil
+}

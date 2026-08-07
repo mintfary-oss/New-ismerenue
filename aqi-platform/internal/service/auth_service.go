@@ -385,3 +385,24 @@ func (s *AuthService) parseToken(tokenString, expectedType string) (*middleware.
 
 	return claims, nil
 }
+
+// ResetPassword меняет пароль пользователя по email.
+// Вызывается после валидации one-time токена сброса.
+func (s *AuthService) ResetPassword(ctx context.Context, email, newPassword string) error {
+	user, err := s.users.GetByEmail(ctx, email)
+	if err != nil {
+		return domain.ErrNotFoundErr("пользователь")
+	}
+
+	hash, err := s.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("AuthService.ResetPassword hash: %w", err)
+	}
+
+	if err := s.users.UpdatePassword(ctx, user.ID, hash); err != nil {
+		return fmt.Errorf("AuthService.ResetPassword update: %w", err)
+	}
+
+	s.logger.Info("пароль сброшен", "email", email)
+	return nil
+}
