@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/mintfary/aqi-platform/internal/service"
 )
 
 // Handlers — корневой контейнер всех HTTP-обработчиков.
@@ -30,22 +32,26 @@ type Handlers struct {
 
 // Deps — зависимости для создания handlers.
 type Deps struct {
-	DB     *pgxpool.Pool
-	Redis  *redis.Client
-	Logger *slog.Logger
+	DB          *pgxpool.Pool
+	Redis       *redis.Client
+	Logger      *slog.Logger
+	AuthSvc     *service.AuthService
+	UserSvc     *service.UserService
+	SensorSvc   *service.SensorService
+	MeasureSvc  *service.MeasurementService
 }
 
 // NewHandlers создаёт все handlers с общими зависимостями.
 func NewHandlers(deps Deps) *Handlers {
 	return &Handlers{
 		Health:      &HealthHandler{db: deps.DB, logger: deps.Logger},
-		Auth:        &AuthHandler{logger: deps.Logger},
-		User:        &UserHandler{logger: deps.Logger},
-		Sensor:      &SensorHandler{logger: deps.Logger},
-		Measurement: &MeasurementHandler{logger: deps.Logger},
+		Auth:        NewAuthHandler(deps.AuthSvc, deps.Logger),
+		User:        NewUserHandler(deps.UserSvc, deps.Logger),
+		Sensor:      NewSensorHandler(deps.SensorSvc, deps.Logger),
+		Measurement: NewMeasurementHandler(deps.MeasureSvc, deps.Logger),
 		Forecast:    &ForecastHandler{logger: deps.Logger},
 		Token:       &TokenHandler{logger: deps.Logger},
-		Ingest:      &IngestHandler{logger: deps.Logger},
+		Ingest:      NewIngestHandler(deps.MeasureSvc, deps.Logger),
 		Report:      &ReportHandler{logger: deps.Logger},
 		Stats:       &StatsHandler{logger: deps.Logger},
 		Feedback:    &FeedbackHandler{logger: deps.Logger},

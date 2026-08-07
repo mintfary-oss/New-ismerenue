@@ -54,3 +54,12 @@ type UpdateSensorInput struct {
 	Type     *SensorType `json:"type"      validate:"omitempty"`
 	IsActive *bool       `json:"is_active"`
 }
+
+// SensorStatusResponse — ответ на запрос статуса датчика.
+type SensorStatusResponse struct {
+	SensorID uuid.UUID  `json:"sensor_id"`
+	Name     string     `json:"name"`
+	IsActive bool       `json:"is_active"`
+	IsOnline bool       `json:"is_online"`
+	LastSeen *time.Time `json:"last_seen"`
+}

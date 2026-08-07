@@ -64,3 +64,19 @@ type ChangePasswordInput struct {
 	OldPassword string `json:"old_password" validate:"required"`
 	NewPassword string `json:"new_password" validate:"required,min=12,max=128"`
 }
+
+// APIToken — токен для доступа к API без пароля (используется внешними системами).
+type APIToken struct {
+	ID        uuid.UUID  `db:"id"`
+	UserID    uuid.UUID  `db:"user_id"`
+	Name      string     `db:"name"`
+	IsActive  bool       `db:"is_active"`
+	ExpiresAt *time.Time `db:"expires_at"`
+	CreatedAt time.Time  `db:"created_at"`
+}
+
+// CreateAPITokenInput — данные для создания API-токена.
+type CreateAPITokenInput struct {
+	Name      string     `json:"name"       validate:"required,min=2,max=100"`
+	ExpiresAt *time.Time `json:"expires_at"`
+}

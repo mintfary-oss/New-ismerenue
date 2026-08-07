@@ -153,3 +153,42 @@
 Выполнил `git fetch` + `git pull` — репозиторий уже был синхронизирован, расхождений с `origin/main` нет. Текущее состояние: 6 наших md-файлов + исходные документы ТЗ, всего 16 файлов. Зафиксировал это сообщение в переписке и обновил `СТАТУС_ПРОЕКТА.md`.
 
 ---
+
+## СООБЩЕНИЕ 6 — ПОЛЬЗОВАТЕЛЬ
+
+> обновил репозиторий проверь и делаем дальше
+
+---
+
+## ОТВЕТ 6 — NEO
+
+Клонировал репозиторий заново. Sprint 1 (коммит `ac555db`) актуален. Запущен **Sprint 2** — реализация реальной бизнес-логики:
+
+**Что реализовано в Sprint 2:**
+
+1. **Слой репозиториев (SQL):**
+   - `UserRepo` — GetByEmail/GetByID/List/Create/Update/Delete/Count + soft-delete
+   - `APITokenRepo` — хранение и проверка API-токенов датчиков
+   - `SensorRepo` — CRUD + UpdateLastSeen (вызывается при каждом измерении)
+   - `MeasurementRepo` — Insert/InsertBatch/List/Aggregate(TimescaleDB time_bucket)/Latest/LatestBySensor
+
+2. **Слой сервисов:**
+   - `AuthService` — Argon2id + JWT (был), добавлен `HashPassword` как публичный метод
+   - `UserService` — CRUD + хэширование пароля + проверка уникальности email + ChangePassword
+   - `SensorService` — CRUD + SensorStatus (online если данные < 30 мин назад)
+   - `MeasurementService` — Ingest (one/batch) + last_seen в фоне + List/Aggregate/Latest
+
+3. **HTTP-обработчики (реальная реализация, не 501):**
+   - `AuthHandler` — Login/Refresh/Logout (с blacklist)
+   - `UserHandler` — List/Create/Get/Update/Delete (без хэша пароля в ответах)
+   - `SensorHandler` — List/Create/Get/Update/Delete/Status
+   - `MeasurementHandler` — List/Latest/Aggregate
+   - `IngestHandler` — Upload (поддержка single + batch JSON)
+
+4. **DI в main.go:**
+   - `runServer`: pool → repo → service → handler → router → server
+   - `runMigrate`: golang-migrate v4 (pgx5 driver + file:// source)
+
+**Итог:** 30 Go-файлов, 4407 строк, `go build ✅`, `go vet ✅`
+
+---

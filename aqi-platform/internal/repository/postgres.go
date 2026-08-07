@@ -3,9 +3,13 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // pgx v5 driver
+	_ "github.com/golang-migrate/migrate/v4/source/file"     // file:// source
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mintfary/aqi-platform/internal/config"
 )
@@ -42,12 +46,29 @@ func NewPostgresPool(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.P
 	return pool, nil
 }
 
-// RunMigrations применяет SQL-миграции из указанной директории.
+// RunMigrations применяет SQL-миграции из указанной директории через golang-migrate.
+// migrationsPath — путь в формате file:///abs/path/to/migrations
+// direction — "up" или "down"
 func RunMigrations(databaseURL, migrationsPath, direction string) error {
-	// Реализация через golang-migrate/migrate подключается здесь.
-	// Вынесено в отдельную функцию для вызова из cobra-команды migrate.
-	_ = databaseURL
-	_ = migrationsPath
-	_ = direction
+	// golang-migrate требует pgx5 URL вида pgx5://user:pass@host/db
+	m, err := migrate.New(migrationsPath, databaseURL)
+	if err != nil {
+		return fmt.Errorf("инициализация миграций: %w", err)
+	}
+	defer m.Close()
+
+	switch direction {
+	case "up":
+		if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("применение миграций (up): %w", err)
+		}
+	case "down":
+		if err := m.Down(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			return fmt.Errorf("откат миграций (down): %w", err)
+		}
+	default:
+		return fmt.Errorf("неизвестное направление: %s (ожидается up | down)", direction)
+	}
+
 	return nil
 }

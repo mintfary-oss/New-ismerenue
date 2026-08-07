@@ -1,15 +1,24 @@
 // Package main — точка входа AQI Platform.
-// Запуск: aqi-platform server | agent | migrate
+// Запуск: aqi-platform server | migrate | version
 package main
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
+
+	"github.com/mintfary/aqi-platform/internal/config"
+	"github.com/mintfary/aqi-platform/internal/handler"
+	"github.com/mintfary/aqi-platform/internal/repository"
+	"github.com/mintfary/aqi-platform/internal/server"
+	"github.com/mintfary/aqi-platform/internal/service"
 )
 
 // Значения проставляются при сборке через -ldflags.
@@ -91,22 +100,137 @@ func buildVersionCmd() *cobra.Command {
 
 // runServer инициализирует и запускает HTTP-сервер с graceful shutdown.
 func runServer(ctx context.Context, configPath string) error {
-	// Контекст с отменой по сигналам ОС.
+	// ── 1. Конфигурация ───────────────────────────────────────────────────
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("загрузка конфигурации: %w", err)
+	}
+
+	// ── 2. Логирование ────────────────────────────────────────────────────
+	logger := buildLogger(cfg.Log)
+
+	logger.Info("AQI Platform запускается",
+		"version", version,
+		"build_time", buildTime,
+		"config", configPath,
+	)
+
+	// ── 3. Контекст с отменой по сигналам ОС ─────────────────────────────
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// TODO Sprint 2: загрузка конфига, инициализация БД, запуск сервера.
-	fmt.Printf("AQI Platform %s запускается...\n", version)
-	fmt.Printf("Конфиг: %s\n", configPath)
+	// ── 4. База данных ────────────────────────────────────────────────────
+	db, err := repository.NewPostgresPool(ctx, cfg.Database)
+	if err != nil {
+		return fmt.Errorf("подключение к PostgreSQL: %w", err)
+	}
+	defer db.Close()
+	logger.Info("PostgreSQL подключён")
 
-	<-ctx.Done()
-	fmt.Println("Остановка сервера...")
-	return nil
+	// ── 5. Redis ──────────────────────────────────────────────────────────
+	redisClient, err := repository.NewRedisClient(ctx, cfg.Redis)
+	if err != nil {
+		return fmt.Errorf("подключение к Redis: %w", err)
+	}
+	defer redisClient.Close()
+	logger.Info("Redis подключён")
+
+	// ── 6. Репозитории ────────────────────────────────────────────────────
+	userRepo := repository.NewUserRepo(db)
+	sensorRepo := repository.NewSensorRepo(db)
+	measurementRepo := repository.NewMeasurementRepo(db)
+
+	// Redis-хранилища.
+	tokenBlacklist := repository.NewTokenBlacklist(redisClient, cfg.Redis.TokenBlacklistTTL)
+	loginAttempts := repository.NewLoginAttemptTracker(
+		redisClient,
+		cfg.Auth.MaxLoginAttempts,
+		cfg.Auth.LockoutDuration,
+	)
+
+	// ── 7. Сервисы ────────────────────────────────────────────────────────
+	authSvc := service.NewAuthService(userRepo, tokenBlacklist, loginAttempts, cfg.Auth, logger)
+	userSvc := service.NewUserService(userRepo, authSvc, logger)
+	sensorSvc := service.NewSensorService(sensorRepo, logger)
+	measureSvc := service.NewMeasurementService(measurementRepo, sensorRepo, logger)
+
+	// ── 8. HTTP-обработчики ───────────────────────────────────────────────
+	handlers := handler.NewHandlers(handler.Deps{
+		DB:         db,
+		Redis:      redisClient,
+		Logger:     logger,
+		AuthSvc:    authSvc,
+		UserSvc:    userSvc,
+		SensorSvc:  sensorSvc,
+		MeasureSvc: measureSvc,
+	})
+
+	// ── 9. Роутер и HTTP-сервер ───────────────────────────────────────────
+	router := server.NewRouter(handlers)
+	srv := server.New(cfg.Server, router, logger)
+
+	logger.Info("HTTP-сервер запущен", "addr", fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port))
+
+	// ── 10. Запуск (блокируется до отмены контекста) ──────────────────────
+	return srv.Start(ctx)
 }
 
 // runMigrate применяет миграции к базе данных.
 func runMigrate(_ context.Context, configPath, direction string) error {
-	// TODO Sprint 2: загрузка конфига и запуск golang-migrate.
-	fmt.Printf("Миграции (%s), конфиг: %s\n", direction, configPath)
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		return fmt.Errorf("загрузка конфигурации: %w", err)
+	}
+
+	// golang-migrate требует URL формата pgx5://user:pass@host:port/db
+	databaseURL := fmt.Sprintf("pgx5://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Name,
+		cfg.Database.SSLMode,
+	)
+
+	// Путь к миграциям в формате file:///abs/path
+	migrationsPath := cfg.Database.MigrationsPath
+	if !strings.HasPrefix(migrationsPath, "file://") {
+		absPath, absErr := filepath.Abs(migrationsPath)
+		if absErr != nil {
+			absPath = migrationsPath
+		}
+		migrationsPath = "file://" + absPath
+	}
+
+	fmt.Printf("Применение миграций (%s): %s\n", direction, migrationsPath)
+
+	if err := repository.RunMigrations(databaseURL, migrationsPath, direction); err != nil {
+		return fmt.Errorf("миграции: %w", err)
+	}
+
+	fmt.Println("Миграции применены успешно")
 	return nil
+}
+
+// buildLogger создаёт slog.Logger с заданными параметрами.
+func buildLogger(cfg config.LogConfig) *slog.Logger {
+	level := slog.LevelInfo
+	switch strings.ToLower(cfg.Level) {
+	case "debug":
+		level = slog.LevelDebug
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
+	}
+
+	opts := &slog.HandlerOptions{Level: level}
+	var h slog.Handler
+	if cfg.Format == "text" {
+		h = slog.NewTextHandler(os.Stdout, opts)
+	} else {
+		h = slog.NewJSONHandler(os.Stdout, opts)
+	}
+
+	return slog.New(h)
 }
