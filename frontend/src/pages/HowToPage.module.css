@@ -1,0 +1,239 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  max-width: 860px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+/* Секция */
+.section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionIcon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Текст */
+.text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+.text strong {
+  color: var(--color-text);
+}
+
+/* Шаги */
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.stepNum {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(91, 141, 238, 0.15);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.stepTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stepDesc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* AQI таблица */
+.aqiTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.aqiTable th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.aqiTable td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.aqiTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* Цветные бейджи AQI */
+.aqiGood    { padding: 2px 10px; border-radius: 10px; background: rgba(0,228,0,0.15); color: #00e400; font-size: 11px; font-weight: 600; }
+.aqiModerate { padding: 2px 10px; border-radius: 10px; background: rgba(255,255,0,0.15); color: #d4d400; font-size: 11px; font-weight: 600; }
+.aqiUnhealthy { padding: 2px 10px; border-radius: 10px; background: rgba(255,126,0,0.15); color: #ff7e00; font-size: 11px; font-weight: 600; }
+.aqiBad { padding: 2px 10px; border-radius: 10px; background: rgba(255,0,0,0.15); color: #ff5555; font-size: 11px; font-weight: 600; }
+.aqiVeryBad { padding: 2px 10px; border-radius: 10px; background: rgba(143,63,151,0.15); color: #c77dd4; font-size: 11px; font-weight: 600; }
+.aqiHazardous { padding: 2px 10px; border-radius: 10px; background: rgba(126,0,35,0.25); color: #f17070; font-size: 11px; font-weight: 600; }
+
+/* Заметки */
+.note {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(91, 141, 238, 0.07);
+  border: 1px solid rgba(91, 141, 238, 0.2);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.noteIcon {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Блок кода */
+.codeBlock {
+  background: #0f1117;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: #7dd3fc;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* Роли */
+.rolesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.roleCard {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roleName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.roleDesc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* FAQ */
+.faqList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.faqItem {
+  border-left: 3px solid var(--color-primary);
+  padding: 4px 0 4px 14px;
+}
+
+.faqQ {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.faqA {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+/* Shortcuts */
+.shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.shortcutRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.kbd {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}

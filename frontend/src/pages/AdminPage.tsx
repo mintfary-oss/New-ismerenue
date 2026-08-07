@@ -519,14 +519,314 @@ function ReportsTab() {
   );
 }
 
+// ─── Подкомпонент: вкладка статистики ─────────────────────────────────────────
+
+interface AvailabilityStat {
+  sensor_id: string;
+  sensor_name: string;
+  total_hours: number;
+  online_hours: number;
+  availability_percent: number;
+}
+
+interface DataCoverageStat {
+  sensor_id: string;
+  parameter: string;
+  coverage_percent: number;
+  total_records: number;
+}
+
+function StatsTab() {
+  const [availability, setAvailability] = useState<AvailabilityStat[]>([]);
+  const [coverage, setCoverage] = useState<DataCoverageStat[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true);
+      setErr('');
+      try {
+        const [avRes, covRes] = await Promise.all([
+          apiClient.get<AvailabilityStat[] | { items: AvailabilityStat[] }>('/stats/availability'),
+          apiClient.get<DataCoverageStat[] | { items: DataCoverageStat[] }>('/stats/data-coverage'),
+        ]);
+        const avData = Array.isArray(avRes.data) ? avRes.data : (avRes.data as { items: AvailabilityStat[] }).items ?? [];
+        const covData = Array.isArray(covRes.data) ? covRes.data : (covRes.data as { items: DataCoverageStat[] }).items ?? [];
+        setAvailability(avData);
+        setCoverage(covData);
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : 'Ошибка загрузки статистики');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  function pctColor(v: number): string {
+    if (v >= 90) return '#68d391';
+    if (v >= 70) return '#f6e05e';
+    return '#fc8181';
+  }
+
+  function PctBar({ value }: { value: number }) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{
+          width: 80, height: 6, background: 'var(--color-border)', borderRadius: 3, overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${Math.min(100, value)}%`, height: '100%',
+            background: pctColor(value), borderRadius: 3, transition: 'width 0.4s',
+          }} />
+        </div>
+        <span style={{ fontSize: 12, color: pctColor(value), fontWeight: 600 }}>
+          {value.toFixed(1)}%
+        </span>
+      </div>
+    );
+  }
+
+  if (loading) return <div className={styles.placeholder}>Загрузка статистики…</div>;
+  if (err) return <div className={styles.placeholder} style={{ color: '#fc8181' }}>{err}</div>;
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.tabHeader}>
+        <span className={styles.count}>Доступность датчиков</span>
+      </div>
+
+      {availability.length === 0 ? (
+        <div className={styles.placeholder}>Нет данных доступности (нужны исторические данные)</div>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Датчик</th>
+                <th>Часов онлайн</th>
+                <th>Всего часов</th>
+                <th>Доступность</th>
+              </tr>
+            </thead>
+            <tbody>
+              {availability.map((a) => (
+                <tr key={a.sensor_id}>
+                  <td>{a.sensor_name}</td>
+                  <td className={styles.muted}>{a.online_hours}</td>
+                  <td className={styles.muted}>{a.total_hours}</td>
+                  <td><PctBar value={a.availability_percent} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className={styles.tabHeader} style={{ marginTop: 8 }}>
+        <span className={styles.count}>Покрытие данных по параметрам</span>
+      </div>
+
+      {coverage.length === 0 ? (
+        <div className={styles.placeholder}>Нет данных покрытия</div>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Датчик</th>
+                <th>Параметр</th>
+                <th>Записей</th>
+                <th>Покрытие</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coverage.map((c, i) => (
+                <tr key={`${c.sensor_id}-${c.parameter}-${i}`}>
+                  <td className={styles.muted} style={{ fontSize: 11 }}>{c.sensor_id.slice(0, 8)}…</td>
+                  <td><code style={{ fontSize: 11 }}>{c.parameter}</code></td>
+                  <td className={styles.muted}>{c.total_records}</td>
+                  <td><PctBar value={c.coverage_percent} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Подкомпонент: вкладка системной информации ────────────────────────────────
+
+interface HealthInfo {
+  status: string;
+  dependencies?: Record<string, { status: string; latency?: string; error?: string }>;
+  uptime?: string;
+  go_version?: string;
+  num_cpu?: number;
+  goroutines?: number;
+}
+
+function SystemTab() {
+  const [health, setHealth] = useState<HealthInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshedAt, setRefreshedAt] = useState(new Date());
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await apiClient.get<HealthInfo>('/../../ready');
+      setHealth(res.data);
+      setRefreshedAt(new Date());
+    } catch {
+      setHealth({ status: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+    ok: { label: 'OK', cls: styles.badgeGreen },
+    degraded: { label: 'Деградация', cls: styles.badgeRed },
+    error: { label: 'Ошибка', cls: styles.badgeRed },
+    not_configured: { label: 'Не настроено', cls: styles.badge },
+  };
+
+  function StatusBadge({ status }: { status: string }) {
+    const s = STATUS_LABELS[status] ?? { label: status, cls: styles.badge };
+    return <span className={s.cls}>{s.label}</span>;
+  }
+
+  const INFO_ROWS = [
+    { label: 'Версия платформы', value: 'AQI Platform v1.0.0' },
+    { label: 'Язык / Runtime', value: health?.go_version ?? '—' },
+    { label: 'CPU cores', value: health?.num_cpu != null ? String(health.num_cpu) : '—' },
+    { label: 'Goroutines', value: health?.goroutines != null ? String(health.goroutines) : '—' },
+    { label: 'Uptime', value: health?.uptime ?? '—' },
+    { label: 'Статус проверен', value: refreshedAt.toLocaleString('ru-RU') },
+  ];
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.tabHeader}>
+        <span className={styles.count}>Состояние системы</span>
+        <button className={styles.btnGhost} onClick={() => void load()} disabled={loading}>
+          {loading ? 'Проверка…' : '↺ Обновить'}
+        </button>
+      </div>
+
+      {/* Общий статус */}
+      <div style={{
+        background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius)', padding: '16px 20px',
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        <span style={{ fontSize: 24 }}>{health?.status === 'ok' ? '✅' : '⚠️'}</span>
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>
+            {health?.status === 'ok' ? 'Всё работает нормально' : 'Обнаружены проблемы'}
+          </div>
+          {health && <StatusBadge status={health.status} />}
+        </div>
+      </div>
+
+      {/* Зависимости */}
+      {health?.dependencies && Object.keys(health.dependencies).length > 0 && (
+        <>
+          <div className={styles.tabHeader} style={{ marginTop: 4 }}>
+            <span className={styles.count}>Зависимости</span>
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Сервис</th>
+                  <th>Статус</th>
+                  <th>Задержка</th>
+                  <th>Ошибка</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(health.dependencies).map(([name, dep]) => (
+                  <tr key={name}>
+                    <td style={{ fontWeight: 500 }}>{name}</td>
+                    <td><StatusBadge status={dep.status} /></td>
+                    <td className={styles.muted}>{dep.latency ?? '—'}</td>
+                    <td className={styles.muted} style={{ color: dep.error ? '#fc8181' : undefined }}>
+                      {dep.error ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* Системная информация */}
+      <div className={styles.tabHeader} style={{ marginTop: 4 }}>
+        <span className={styles.count}>Системная информация</span>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <tbody>
+            {INFO_ROWS.map((row) => (
+              <tr key={row.label}>
+                <td style={{ fontWeight: 500, width: '40%' }}>{row.label}</td>
+                <td className={styles.muted}>{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Ссылки */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <a
+          href="/api/v1/docs"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.btnGhost}
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          📖 Swagger API Docs
+        </a>
+        <a
+          href="/api/v1/openapi.yaml"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.btnGhost}
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          📄 OpenAPI YAML
+        </a>
+        <a
+          href="/widget/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles.btnGhost}
+          style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        >
+          🌐 Публичный виджет
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ─── Главный компонент AdminPage ───────────────────────────────────────────────
 
-type TabId = 'users' | 'sensors' | 'reports';
+type TabId = 'users' | 'sensors' | 'reports' | 'stats' | 'system';
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'users', label: 'Пользователи', icon: '👥' },
   { id: 'sensors', label: 'Датчики', icon: '📡' },
   { id: 'reports', label: 'Отчёты', icon: '📄' },
+  { id: 'stats', label: 'Статистика', icon: '📈' },
+  { id: 'system', label: 'Система', icon: '⚙️' },
 ];
 
 export default function AdminPage() {
@@ -552,6 +852,8 @@ export default function AdminPage() {
       {tab === 'users' && <UsersTab />}
       {tab === 'sensors' && <SensorsTab />}
       {tab === 'reports' && <ReportsTab />}
+      {tab === 'stats' && <StatsTab />}
+      {tab === 'system' && <SystemTab />}
     </div>
   );
 }
