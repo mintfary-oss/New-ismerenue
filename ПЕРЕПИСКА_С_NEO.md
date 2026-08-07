@@ -392,3 +392,36 @@
 
 `tsc ✅` | `npm build ✅` | `go build ✅`
 
+---
+
+## СООБЩЕНИЕ 16 — ПОЛЬЗОВАТЕЛЬ
+
+> Проверь обнови репозиторий и давай дальше
+
+---
+
+## ОТВЕТ 16 — NEO
+
+Репозиторий актуален (97579d3). Выполнен **Sprint 9**.
+
+**1. Prometheus metrics** (`internal/metrics/metrics.go`):
+- `/metrics` эндпоинт (Prometheus scrape)
+- Middleware для всех HTTP-запросов: `aqi_http_requests_total`, `aqi_http_request_duration_seconds`, `aqi_http_active_connections`
+- Бизнес-метрики: `aqi_air_current_aqi`, `aqi_ingest_measurements_total`, `aqi_forecast_runs_total`, `aqi_forecast_run_duration_seconds`, `aqi_forecast_errors_total`, `aqi_sensor_active_total`, `aqi_sensor_online_total`
+- DB метрики: `aqi_db_pool_total_conns`, `aqi_db_pool_idle_conns`
+- IMAP метрики: `aqi_imap_polls_total`
+- Go runtime + process collectors (memory, GC, goroutines, CPU)
+
+**2. pg_dump бэкап** (`scripts/backup.sh`, `scripts/restore.sh`):
+- Автоматический pg_dump каждые 6 часов (02:00, 08:00, 14:00, 20:00)
+- Хранение 30 дней (настраивается `BACKUP_KEEP_DAYS`)
+- Новый Docker Compose сервис `backup` (postgres:17-alpine + crond)
+- `restore.sh` — восстановление с подтверждением
+
+**3. E2E HTTP тесты** (`internal/e2e/e2e_test.go`):
+- 15 тестов через `net/http/httptest` — полный HTTP-стек без реальной БД
+- Все мок-репозитории in-memory в одном файле
+- Покрыты: health, ready, metrics, docs, openapi, widget, public forecast, 7 protected routes → 401, login wrong/invalid, login cycle, invalid JWT → 401, 404
+
+`go build ✅` | `go test ./... ✅` (2 пакета, все PASS)
+

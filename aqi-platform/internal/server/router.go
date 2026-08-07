@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/cors"
 	"github.com/mintfary/aqi-platform/internal/domain"
 	"github.com/mintfary/aqi-platform/internal/handler"
+	"github.com/mintfary/aqi-platform/internal/metrics"
 	"github.com/mintfary/aqi-platform/internal/middleware"
 )
 
@@ -18,6 +19,7 @@ func NewRouter(h *handler.Handlers, auth middleware.TokenValidator) http.Handler
 	r := chi.NewRouter()
 
 	// ── Базовый стек middleware ────────────────────────────────────────────
+	r.Use(metrics.Middleware) // сбор Prometheus HTTP-метрик
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.Logger)
@@ -36,9 +38,10 @@ func NewRouter(h *handler.Handlers, auth middleware.TokenValidator) http.Handler
 		MaxAge:           300,
 	}))
 
-	// ── Публичные маршруты (без авторизации) ──────────────────────────────
+	// ── Системные маршруты (без авторизации) ──────────────────────────────
 	r.Get("/health", h.Health.Live)
 	r.Get("/ready", h.Health.Ready)
+	r.Get("/metrics", metrics.Handler().ServeHTTP) // Prometheus scrape endpoint
 
 	r.Route("/widget", func(r chi.Router) {
 		r.Use(middleware.WidgetSecurityHeaders())

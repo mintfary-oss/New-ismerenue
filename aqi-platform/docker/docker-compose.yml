@@ -138,6 +138,42 @@ services:
         limits:
           memory: 160M
 
+  # ── Backup (pg_dump каждые 6 часов) ───────────────────────────────────────
+  # Использует docker-entrypoint: запускает cron + хранит бэкапы в volume backup_data.
+  # Хранит последние 30 дней (BACKUP_KEEP_DAYS).
+  backup:
+    image: postgres:17-alpine
+    container_name: aqi_backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST:       "postgres"
+      DB_PORT:       "5432"
+      DB_NAME:       "aqi"
+      DB_USER:       "aqi"
+      DB_PASSWORD:   "${DB_PASSWORD}"
+      BACKUP_DIR:    "/backups"
+      BACKUP_KEEP_DAYS: "${BACKUP_KEEP_DAYS:-30}"
+    volumes:
+      - backup_data:/backups
+      - ../scripts/backup.sh:/scripts/backup.sh:ro
+    # Запускаем crond (Alpine): каждые 6 часов в 02:00, 08:00, 14:00, 20:00
+    command: >
+      sh -c "
+        chmod +x /scripts/backup.sh &&
+        echo '0 2,8,14,20 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1' | crontab - &&
+        echo 'Сервис бэкапа запущен. Расписание: каждые 6 часов' &&
+        crond -f -d 8
+      "
+    networks:
+      - aqi_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   # ── Nginx (reverse proxy + TLS + SPA) ─────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
@@ -180,6 +216,8 @@ volumes:
     driver: local
   spa_dist:
     driver: local    # хранит собранный React SPA (заполняется frontend-сервисом)
+  backup_data:
+    driver: local    # хранит pg_dump-бэкапы (30 дней)
 
 # ── Networks ───────────────────────────────────────────────────────────────
 networks:

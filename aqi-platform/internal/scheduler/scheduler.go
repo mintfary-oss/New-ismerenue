@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mintfary/aqi-platform/internal/config"
+	"github.com/mintfary/aqi-platform/internal/metrics"
 )
 
 // ForecastRunner — интерфейс для запуска расчёта прогноза.
@@ -92,11 +93,17 @@ func (s *Scheduler) forecastLoop(ctx context.Context, interval time.Duration) {
 // runForecast выполняет один цикл расчёта прогноза.
 func (s *Scheduler) runForecast(ctx context.Context) {
 	start := time.Now()
+	metrics.ForecastRunsTotal.Inc()
+
 	if err := s.forecast.Run(ctx); err != nil {
 		s.logger.Error("расчёт прогноза: ошибка", "err", err)
+		metrics.ForecastErrors.Inc()
 		return
 	}
-	s.logger.Info("расчёт прогноза: успешно", "duration", time.Since(start).Round(time.Millisecond))
+
+	dur := time.Since(start)
+	metrics.ForecastRunDuration.Observe(dur.Seconds())
+	s.logger.Info("расчёт прогноза: успешно", "duration", dur.Round(time.Millisecond))
 }
 
 // retentionLoop выполняет удаление устаревших данных раз в сутки.
