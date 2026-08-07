@@ -1,0 +1,19 @@
+{
+  "name": "AQI Кемерово — Мониторинг воздуха",
+  "short_name": "AQI Кемерово",
+  "description": "Качество атмосферного воздуха в реальном времени",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1f2e",
+  "theme_color": "#1a1f2e",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["utilities", "health"]
+}

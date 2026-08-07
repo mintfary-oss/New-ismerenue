@@ -1,0 +1,363 @@
+/* SensorsPage — стили страницы оборудования */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 960px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.pageSubtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin: -16px 0 0;
+}
+
+/* ── Секции ─────────────────────────────────────────────────────────────────── */
+
+.section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.sectionIcon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.sectionDesc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── Сетка карточек ─────────────────────────────────────────────────────────── */
+
+.deviceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+/* ── Карточка устройства ────────────────────────────────────────────────────── */
+
+.deviceCard {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.deviceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.deviceName {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.deviceModel {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.deviceMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metaItem {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.deviceParams,
+.deviceInterfaces {
+  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.deviceParams strong,
+.deviceInterfaces strong {
+  color: var(--color-text-muted);
+  margin-right: 2px;
+  font-weight: 500;
+}
+
+.paramTag {
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.ifaceTag {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.deviceNote {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin: 0;
+  border-top: 1px solid var(--color-border);
+  padding-top: 8px;
+}
+
+/* ── Бейджи поддержки ───────────────────────────────────────────────────────── */
+
+.badgeSupported {
+  background: color-mix(in srgb, var(--color-aqi-good) 15%, transparent);
+  color: var(--color-aqi-good);
+  border: 1px solid color-mix(in srgb, var(--color-aqi-good) 30%, transparent);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.badgePlanned {
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Таблица операторов ─────────────────────────────────────────────────────── */
+
+.operatorTable {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.operatorTable table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.operatorTable th {
+  text-align: left;
+  padding: 8px 12px;
+  background: var(--color-background);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.operatorTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.operatorTable tr:last-child td {
+  border-bottom: none;
+}
+
+.operatorTable code {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ── Список интерфейсов ─────────────────────────────────────────────────────── */
+
+.ifaceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ifaceItem {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  align-items: baseline;
+}
+
+.ifaceItem:last-child {
+  border-bottom: none;
+}
+
+.ifaceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.ifaceDesc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* ── Список ГОСТов ──────────────────────────────────────────────────────────── */
+
+.gostList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.gostItem {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  align-items: baseline;
+}
+
+.gostItem:last-child {
+  border-bottom: none;
+}
+
+.gostCode {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: monospace;
+}
+
+.gostTitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* ── Блок кода ──────────────────────────────────────────────────────────────── */
+
+.text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.text strong {
+  color: var(--color-text);
+}
+
+.codeBlock {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.codeBlock code {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text);
+  white-space: pre;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.textMuted {
+  color: var(--color-text-muted);
+}
+
+/* ── Адаптивность (3G/медленные соединения — меньше колонок) ────────────────── */
+
+@media (max-width: 768px) {
+  .deviceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ifaceItem {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .gostItem {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .operatorTable th:nth-child(3),
+  .operatorTable td:nth-child(3) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    gap: 16px;
+  }
+
+  .section {
+    padding: 16px;
+  }
+
+  .deviceCard {
+    padding: 12px;
+  }
+
+  .operatorTable th:nth-child(4),
+  .operatorTable td:nth-child(4) {
+    display: none;
+  }
+}

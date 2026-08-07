@@ -1,10 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <!-- Адаптивность: правильный масштаб на мобильных (3G/4G телефоны) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Описание для поисковиков и браузерных закладок -->
+    <meta name="description" content="Платформа мониторинга качества атмосферного воздуха. Онлайн-данные датчиков, прогноз AQI, карта загрязнений." />
+    <meta name="theme-color" content="#1a1f2e" />
+    <!-- Запрет телефонного автоопределения номеров (экономия трафика на 3G) -->
+    <meta name="format-detection" content="telephone=no" />
+    <!-- Для iOS: иконка и цвет строки статуса -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AQI Кемерово" />
+    <!-- Open Graph (для ссылок в мессенджерах: Telegram, VK и др.) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AQI Platform — Мониторинг воздуха" />
+    <meta property="og:description" content="Качество атмосферного воздуха в реальном времени. Прогнозы, карта, аналитика." />
+    <meta property="og:locale" content="ru_RU" />
+    <!-- Иконка -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <!-- PWA манифест для установки на экран телефона -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>AQI Кемерово — Мониторинг воздуха</title>
+    <!-- Предзагрузка service worker (кеширование для 3G) -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

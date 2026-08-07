@@ -8,6 +8,7 @@ import styles from './Layout.module.css';
 const NAV_ITEMS = [
   { path: '/dashboard', label: 'Дашборд', icon: '📊' },
   { path: '/map', label: 'Карта', icon: '🗺️' },
+  { path: '/sensors', label: 'Датчики и приборы', icon: '🔬' },
   { path: '/howto', label: 'Как пользоваться', icon: '📖' },
 ];
 

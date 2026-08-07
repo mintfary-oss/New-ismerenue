@@ -12,6 +12,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const MapPage = lazy(() => import('./pages/MapPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const HowToPage = lazy(() => import('./pages/HowToPage'));
+const SensorsPage = lazy(() => import('./pages/SensorsPage'));
 
 /** Защищённый маршрут — редирект на /login если нет токена. */
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -75,6 +76,14 @@ export default function App() {
             element={
               <Suspense fallback={<div style={{ padding: 24, color: 'var(--color-text-muted)' }}>Загрузка…</div>}>
                 <HowToPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="sensors"
+            element={
+              <Suspense fallback={<div style={{ padding: 24, color: 'var(--color-text-muted)' }}>Загрузка…</div>}>
+                <SensorsPage />
               </Suspense>
             }
           />
