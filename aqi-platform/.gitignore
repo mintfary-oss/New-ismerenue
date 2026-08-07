@@ -1,0 +1,40 @@
+# Бинарники и артефакты сборки
+bin/
+*.exe
+
+# Go
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Конфигурационные файлы с секретами
+.env
+config.yaml
+!config.example.yaml
+!.env.example
+
+# TLS сертификаты (генерируются при установке)
+docker/nginx/ssl/
+
+# База данных (локальная разработка)
+*.db
+*.sqlite
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Docker volumes (если монтируются локально)
+postgres_data/
+redis_data/
+
+# Сгенерированный код sqlc (обновляется через make sqlc)
+# internal/repository/generated/  ← НЕ игнорируем, коммитим
+
+# Временные файлы
+tmp/
+temp/
