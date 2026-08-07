@@ -192,3 +192,28 @@
 **Итог:** 30 Go-файлов, 4407 строк, `go build ✅`, `go vet ✅`
 
 ---
+
+## СООБЩЕНИЕ 7 — ПОЛЬЗОВАТЕЛЬ
+
+> Проверь обновил репозиторий спушил все как надо и дальше делаем
+
+---
+
+## ОТВЕТ 7 — NEO
+
+Проверил: коммит `fcf200b` (Sprint 2) актуален. Запущен **Sprint 3** — прогнозный движок, виджет, планировщик, JWT Auth.
+
+**Реализовано:**
+- `domain/forecast_points.go` — 4 точки мониторинга Кемерово
+- `service/forecast_service.go` — EWMA (α=0.3) + IDW (p=2), горизонты 0h–6h
+- `repository/forecast.go` — InsertBatch upsert, Latest, ByPoint, ByDistrict, CityAverage
+- `handler/forecast_handler.go` — 5 endpoints (Points/Current/CityAverage/ByPoint/ByDistrict)
+- `handler/widget_handler.go` — HTML iframe + /data + /forecast + /weather
+- `scheduler/scheduler.go` — прогноз каждые 20 мин, retention 5 лет
+- `server/router.go` — JWT middleware на все `/api/v1/*`, публичные: /widget + /api/v1/auth + /api/v1/public
+- `migrations/000003` — уникальный индекс forecasts
+- `main.go` — ForecastRepo, ForecastService, Scheduler, authSvc → router
+
+**Итог:** 36 Go-файлов, 5861 строк | `go build ✅` | `go vet ✅`
+
+---

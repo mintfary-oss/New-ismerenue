@@ -17,6 +17,7 @@ import (
 	"github.com/mintfary/aqi-platform/internal/config"
 	"github.com/mintfary/aqi-platform/internal/handler"
 	"github.com/mintfary/aqi-platform/internal/repository"
+	"github.com/mintfary/aqi-platform/internal/scheduler"
 	"github.com/mintfary/aqi-platform/internal/server"
 	"github.com/mintfary/aqi-platform/internal/service"
 )
@@ -139,6 +140,7 @@ func runServer(ctx context.Context, configPath string) error {
 	userRepo := repository.NewUserRepo(db)
 	sensorRepo := repository.NewSensorRepo(db)
 	measurementRepo := repository.NewMeasurementRepo(db)
+	forecastRepo := repository.NewForecastRepo(db)
 
 	// Redis-хранилища.
 	tokenBlacklist := repository.NewTokenBlacklist(redisClient, cfg.Redis.TokenBlacklistTTL)
@@ -153,25 +155,31 @@ func runServer(ctx context.Context, configPath string) error {
 	userSvc := service.NewUserService(userRepo, authSvc, logger)
 	sensorSvc := service.NewSensorService(sensorRepo, logger)
 	measureSvc := service.NewMeasurementService(measurementRepo, sensorRepo, logger)
+	forecastSvc := service.NewForecastService(measurementRepo, forecastRepo, cfg.Forecast, logger)
 
-	// ── 8. HTTP-обработчики ───────────────────────────────────────────────
+	// ── 8. Планировщик фоновых задач ─────────────────────────────────────
+	sched := scheduler.New(forecastSvc, measurementRepo, forecastRepo, cfg.Forecast, logger)
+	go sched.Start(ctx)
+
+	// ── 9. HTTP-обработчики ───────────────────────────────────────────────
 	handlers := handler.NewHandlers(handler.Deps{
-		DB:         db,
-		Redis:      redisClient,
-		Logger:     logger,
-		AuthSvc:    authSvc,
-		UserSvc:    userSvc,
-		SensorSvc:  sensorSvc,
-		MeasureSvc: measureSvc,
+		DB:          db,
+		Redis:       redisClient,
+		Logger:      logger,
+		AuthSvc:     authSvc,
+		UserSvc:     userSvc,
+		SensorSvc:   sensorSvc,
+		MeasureSvc:  measureSvc,
+		ForecastSvc: forecastSvc,
 	})
 
-	// ── 9. Роутер и HTTP-сервер ───────────────────────────────────────────
-	router := server.NewRouter(handlers)
+	// ── 10. Роутер и HTTP-сервер ──────────────────────────────────────────
+	router := server.NewRouter(handlers, authSvc)
 	srv := server.New(cfg.Server, router, logger)
 
 	logger.Info("HTTP-сервер запущен", "addr", fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port))
 
-	// ── 10. Запуск (блокируется до отмены контекста) ──────────────────────
+	// ── 11. Запуск (блокируется до отмены контекста) ─────────────────────
 	return srv.Start(ctx)
 }
 

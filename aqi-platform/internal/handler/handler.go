@@ -39,6 +39,7 @@ type Deps struct {
 	UserSvc     *service.UserService
 	SensorSvc   *service.SensorService
 	MeasureSvc  *service.MeasurementService
+	ForecastSvc *service.ForecastService
 }
 
 // NewHandlers создаёт все handlers с общими зависимостями.
@@ -49,13 +50,13 @@ func NewHandlers(deps Deps) *Handlers {
 		User:        NewUserHandler(deps.UserSvc, deps.Logger),
 		Sensor:      NewSensorHandler(deps.SensorSvc, deps.Logger),
 		Measurement: NewMeasurementHandler(deps.MeasureSvc, deps.Logger),
-		Forecast:    &ForecastHandler{logger: deps.Logger},
+		Forecast:    NewForecastHandler(deps.ForecastSvc, deps.Logger),
 		Token:       &TokenHandler{logger: deps.Logger},
 		Ingest:      NewIngestHandler(deps.MeasureSvc, deps.Logger),
 		Report:      &ReportHandler{logger: deps.Logger},
 		Stats:       &StatsHandler{logger: deps.Logger},
 		Feedback:    &FeedbackHandler{logger: deps.Logger},
-		Widget:      &WidgetHandler{logger: deps.Logger},
+		Widget:      NewWidgetHandler(deps.MeasureSvc, deps.ForecastSvc, deps.Logger),
 	}
 }
 
