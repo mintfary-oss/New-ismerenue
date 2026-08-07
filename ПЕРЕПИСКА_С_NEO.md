@@ -111,6 +111,37 @@
 
 ---
 
+## СООБЩЕНИЕ 6 — ПОЛЬЗОВАТЕЛЬ
+
+> Начинаем
+
+---
+
+## ОТВЕТ 6 — NEO
+
+**Sprint 1 завершён.** Написано 39 файлов, 3787 строк кода на Go. Коммит `ac555db`.
+
+**Что создано в `aqi-platform/`:**
+
+Структура (39 файлов):
+- `cmd/aqi-platform/main.go` — точка входа, cobra CLI (server/migrate/version)
+- `internal/config/` — Viper конфиг + полная структура всех параметров
+- `internal/domain/` — user, sensor, measurement, aqi, errors (чистые Go-структуры)
+- `internal/server/` — HTTP сервер с graceful shutdown + Chi роутер (40+ маршрутов)
+- `internal/handler/` — health handler + заглушки всех handlers
+- `internal/middleware/` — auth JWT, RBAC, security headers OWASP, rate limiter
+- `internal/repository/` — pgx/v5 пул + Redis клиент + блеклист токенов + SQL запросы
+- `internal/service/auth_service.go` — Argon2id пароли + JWT access/refresh + rotation
+- `migrations/` — 2 SQL миграции: схема + TimescaleDB hypertables
+- `docker/` — Dockerfile (multi-stage ~2.5 МБ), docker-compose.yml (4 сервиса), nginx.conf
+- `scripts/install.sh` — одна команда установки (как CasaOS)
+- `Makefile`, `.gitignore`, `.env.example`, `sqlc.yaml`
+
+Результат `go vet + go build`: ✅ без ошибок
+Размер бинарника: **2.5 МБ** (статически слинкованный)
+
+---
+
 ## СООБЩЕНИЕ 5 — ПОЛЬЗОВАТЕЛЬ
 
 > Обновил репозиторий
