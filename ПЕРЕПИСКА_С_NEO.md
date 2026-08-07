@@ -318,3 +318,55 @@
 **Sprint 6 — CI/CD + TLS + unit-тесты**
 
 ---
+
+## СООБЩЕНИЕ 12 — ПОЛЬЗОВАТЕЛЬ
+
+> Дальше
+
+---
+
+## ОТВЕТ 12 — NEO
+
+Завершён **Sprint 6**: GitHub Actions CI, TLS certbot, unit-тесты, TimescaleDB retention policy, SMTP сброс пароля. Коммиты `b0d17b0` и `e4f2b96`. Покрытие тестами: 19.8%.
+
+---
+
+## СООБЩЕНИЕ 13 — ПОЛЬЗОВАТЕЛЬ
+
+> Обнови репозиторий
+
+---
+
+## ОТВЕТ 13 — NEO
+
+Репозиторий обновлён (ПЕРЕПИСКА и СТАТУС). Sprint 7 стартует.
+
+---
+
+## СООБЩЕНИЕ 14 — ПОЛЬЗОВАТЕЛЬ
+
+> 09:05 дальше и обнови репозиторий
+
+---
+
+## ОТВЕТ 14 — NEO
+
+Завершён **Sprint 7** — тесты ForecastService, MeasurementService, SensorService + OpenAPI 3.1. Коммит текущего Sprint 7.
+
+**Что сделано:**
+
+| Файл | Содержание |
+|---|---|
+| `service/forecast_service_test.go` | 17 тестов: computeEWMA, haversine, buildHorizons, IDW, Run (2 пути) |
+| `service/measurement_service_test.go` | 18 тестов: Ingest, IngestBatch, AQI, AQIToCategory |
+| `service/sensor_service_test.go` | 23 теста: List, GetByID, Create, Update, Delete, SensorStatus |
+| `api/openapi.yaml` | Полная OpenAPI 3.1 — 40+ endpoints, все схемы, все роли |
+| `internal/docs/embed.go` | go:embed — YAML встроен в бинарник |
+| `internal/handler/health.go` | `/api/v1/docs` → Swagger UI; `/api/v1/openapi.yaml` → embedded YAML |
+
+**Итог:** 58 тестов (все PASS), покрытие 19.8% → **59.9%** | `go build ✅`
+
+**Готовность: ~88%**
+
+Следующий шаг — Sprint 8: E2E интеграционные тесты (httptest + testcontainers) или Prometheus мониторинг. Скажите "Sprint 8" когда будете готовы.
+
