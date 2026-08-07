@@ -267,3 +267,54 @@
 **Итог:** 46 Go-файлов, 7457 строк | `go build ✅` | `go vet ✅`
 
 ---
+
+## СООБЩЕНИЕ 10 — ПОЛЬЗОВАТЕЛЬ
+
+> продолжаем
+
+---
+
+## ОТВЕТ 10 — NEO
+
+Завершён **Sprint 5B** — React SPA фронтенд. Коммит `e4d63ad`.
+
+**37 файлов, 5201 строк TypeScript/CSS:**
+
+- `frontend/` — Vite + React 18 + TypeScript
+- `LoginPage` — форма входа, JWT, авторизация через Go API
+- `DashboardPage` — карточки AQI + AreaChart история 24ч (Recharts) + прогноз
+- `MapPage` — интерактивная карта MapLibre GL 6 (BSD), цветные маркеры AQI
+- `AdminPage` — 3 вкладки: управление пользователями, датчиками, отчётами
+- `Layout` — навигация, RBAC-проверки (admin-only секции)
+- Zustand auth store + `useMe` hook для восстановления сессии
+- Code splitting: MapLibre GL (~950KB) загружается лениво
+- `Nginx` обновлён: `/api/` → Go API, `/widget/` → Go, `/` → SPA (try_files)
+- `Docker Compose` обновлён: `frontend` builder → `spa_dist` volume → Nginx
+- `frontend/Dockerfile` — multi-stage: Node.js build + Alpine copy image
+
+`tsc --noEmit ✅` | `npm run build ✅` | `go build ✅`
+
+---
+
+## СООБЩЕНИЕ 11 — ПОЛЬЗОВАТЕЛЬ
+
+> Обнови репозиторий и давай дальше
+
+---
+
+## ОТВЕТ 11 — NEO
+
+Репозиторий обновлён (коммит добавлен с обновлёнными ПЕРЕПИСКА и СТАТУС). Продолжаем Sprint 6.
+
+**Текущая готовность: ~78%**
+
+| Слой | % |
+|---|---|
+| Бэкенд API | 75% |
+| База данных | 90% |
+| Инфраструктура | 70% |
+| Фронтенд | 80% |
+
+**Sprint 6 — CI/CD + TLS + unit-тесты**
+
+---
