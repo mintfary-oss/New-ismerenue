@@ -141,6 +141,10 @@ func runServer(ctx context.Context, configPath string) error {
 	sensorRepo := repository.NewSensorRepo(db)
 	measurementRepo := repository.NewMeasurementRepo(db)
 	forecastRepo := repository.NewForecastRepo(db)
+	tokenRepo := repository.NewTokenRepo(db)
+	feedbackRepo := repository.NewFeedbackRepo(db)
+	statsRepo := repository.NewStatsRepo(db)
+	reportRepo := repository.NewReportRepo(db)
 
 	// Redis-хранилища.
 	tokenBlacklist := repository.NewTokenBlacklist(redisClient, cfg.Redis.TokenBlacklistTTL)
@@ -156,6 +160,7 @@ func runServer(ctx context.Context, configPath string) error {
 	sensorSvc := service.NewSensorService(sensorRepo, logger)
 	measureSvc := service.NewMeasurementService(measurementRepo, sensorRepo, logger)
 	forecastSvc := service.NewForecastService(measurementRepo, forecastRepo, cfg.Forecast, logger)
+	tokenSvc := service.NewTokenService(tokenRepo, userRepo, cfg.Auth.JWTSecret, logger)
 
 	// ── 8. Планировщик фоновых задач ─────────────────────────────────────
 	sched := scheduler.New(forecastSvc, measurementRepo, forecastRepo, cfg.Forecast, logger)
@@ -171,6 +176,10 @@ func runServer(ctx context.Context, configPath string) error {
 		SensorSvc:   sensorSvc,
 		MeasureSvc:  measureSvc,
 		ForecastSvc: forecastSvc,
+		TokenSvc:    tokenSvc,
+		FeedbackRepo: feedbackRepo,
+		StatsRepo:    statsRepo,
+		ReportRepo:   reportRepo,
 	})
 
 	// ── 10. Роутер и HTTP-сервер ──────────────────────────────────────────

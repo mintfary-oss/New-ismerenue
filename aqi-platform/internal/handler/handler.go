@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/mintfary/aqi-platform/internal/repository"
 	"github.com/mintfary/aqi-platform/internal/service"
 )
 
@@ -40,6 +41,10 @@ type Deps struct {
 	SensorSvc   *service.SensorService
 	MeasureSvc  *service.MeasurementService
 	ForecastSvc *service.ForecastService
+	TokenSvc     *service.TokenService
+	FeedbackRepo *repository.FeedbackRepo
+	StatsRepo    *repository.StatsRepo
+	ReportRepo   *repository.ReportRepo
 }
 
 // NewHandlers создаёт все handlers с общими зависимостями.
@@ -51,11 +56,11 @@ func NewHandlers(deps Deps) *Handlers {
 		Sensor:      NewSensorHandler(deps.SensorSvc, deps.Logger),
 		Measurement: NewMeasurementHandler(deps.MeasureSvc, deps.Logger),
 		Forecast:    NewForecastHandler(deps.ForecastSvc, deps.Logger),
-		Token:       &TokenHandler{logger: deps.Logger},
+		Token:       NewTokenHandler(deps.TokenSvc, deps.Logger),
 		Ingest:      NewIngestHandler(deps.MeasureSvc, deps.Logger),
-		Report:      &ReportHandler{logger: deps.Logger},
-		Stats:       &StatsHandler{logger: deps.Logger},
-		Feedback:    &FeedbackHandler{logger: deps.Logger},
+		Report:      NewReportHandler(deps.ReportRepo, deps.StatsRepo, deps.Logger),
+		Stats:       NewStatsHandler(deps.StatsRepo, deps.Logger),
+		Feedback:    NewFeedbackHandler(deps.FeedbackRepo, deps.Logger),
 		Widget:      NewWidgetHandler(deps.MeasureSvc, deps.ForecastSvc, deps.Logger),
 	}
 }

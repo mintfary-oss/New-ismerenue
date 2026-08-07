@@ -66,17 +66,36 @@ type ChangePasswordInput struct {
 }
 
 // APIToken — токен для доступа к API без пароля (используется внешними системами).
+// TokenHash намеренно отсутствует — никогда не возвращается клиенту.
 type APIToken struct {
-	ID        uuid.UUID  `db:"id"`
-	UserID    uuid.UUID  `db:"user_id"`
-	Name      string     `db:"name"`
-	IsActive  bool       `db:"is_active"`
-	ExpiresAt *time.Time `db:"expires_at"`
-	CreatedAt time.Time  `db:"created_at"`
+	ID        uuid.UUID  `db:"id"         json:"id"`
+	UserID    uuid.UUID  `db:"user_id"    json:"user_id"`
+	Name      string     `db:"name"       json:"name"`
+	LastUsed  *time.Time `db:"last_used"  json:"last_used"`
+	ExpiresAt *time.Time `db:"expires_at" json:"expires_at"`
+	CreatedAt time.Time  `db:"created_at" json:"created_at"`
 }
 
 // CreateAPITokenInput — данные для создания API-токена.
 type CreateAPITokenInput struct {
 	Name      string     `json:"name"       validate:"required,min=2,max=100"`
 	ExpiresAt *time.Time `json:"expires_at"`
+}
+
+// Feedback — обращение/предложение от пользователя.
+type Feedback struct {
+	ID        uuid.UUID  `db:"id"         json:"id"`
+	UserID    *uuid.UUID `db:"user_id"    json:"user_id"`
+	Email     *string    `db:"email"      json:"email"`
+	Subject   string     `db:"subject"    json:"subject"`
+	Message   string     `db:"message"    json:"message"`
+	Status    string     `db:"status"     json:"status"`
+	CreatedAt time.Time  `db:"created_at" json:"created_at"`
+}
+
+// CreateFeedbackInput — данные для создания обращения.
+type CreateFeedbackInput struct {
+	Email   string `json:"email"   validate:"omitempty,email,max=255"`
+	Subject string `json:"subject" validate:"required,min=3,max=200"`
+	Message string `json:"message" validate:"required,min=10,max=5000"`
 }

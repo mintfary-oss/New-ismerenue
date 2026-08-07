@@ -217,3 +217,33 @@
 **Итог:** 36 Go-файлов, 5861 строк | `go build ✅` | `go vet ✅`
 
 ---
+
+## СООБЩЕНИЕ 8 — ПОЛЬЗОВАТЕЛЬ
+
+> 06:57 обновил репозиторий проверь и делаем дальше
+
+---
+
+## ОТВЕТ 8 — NEO
+
+Репозиторий актуален (Sprint 3, коммит `2cc8bc6`). Запущен **Sprint 4** — APIToken, Feedback, Stats, Reports.
+
+**Реализовано:**
+
+- `domain/user.go` — обновлён `APIToken` (соответствует схеме БД: `LastUsed`, убран `IsActive`), добавлены `Feedback`, `CreateFeedbackInput`
+- `repository/token.go` — `TokenRepo`: List/Create/Delete/GetByHash/UpdateLastUsed
+- `service/token_service.go` — `TokenService`: генерация (32 байта hex), HMAC-SHA256 хеш, ValidateAPIToken
+- `handler/token_handler.go` — `TokenHandler`: GET /tokens, POST /tokens, DELETE /tokens/{id}
+- `repository/feedback.go` — `FeedbackRepo`: Create/List (Admin видит все, User — только свои)
+- `handler/feedback_handler.go` — `FeedbackHandler`: POST /feedback, GET /feedback
+- `repository/stats.go` — `StatsRepo`: Availability (% доступности датчиков), DataCoverage (% покрытия параметров)
+- `handler/stats_handler.go` — `StatsHandler`: GET /stats/availability, GET /stats/data-coverage
+- `migrations/000004_reports` — таблица `reports` (status/file_data/row_count)
+- `repository/report.go` — `ReportRepo`: Create/SetReady/SetError/List/GetFileData
+- `handler/report_handler.go` — `ReportHandler`: GET /reports, POST /reports/generate, GET /reports/{id}/download
+- `handler/stubs.go` — все стабы убраны, Sprint 4 полностью реализован
+- `main.go` — tokenRepo, feedbackRepo, statsRepo, reportRepo + полный DI
+
+**Итог:** 45 Go-файлов, 7143 строк | `go build ✅` | `go vet ✅`
+
+---
