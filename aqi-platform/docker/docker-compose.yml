@@ -44,8 +44,18 @@ services:
     logging: *default-logging
 
   # ── Приложение ─────────────────────────────────────────────────────────────
+  # Сборка из локальных исходников — не требует внешних реестров образов.
+  # Контекст сборки: каталог aqi-platform/ (где лежит go.mod).
+  # Dockerfile: aqi-platform/docker/Dockerfile
   app:
-    image: ghcr.io/mintfary/aqi-platform:${APP_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        VERSION: "${APP_VERSION:-dev}"
+        BUILD_TIME: "${BUILD_TIME:-unknown}"
+        GIT_COMMIT: "${GIT_COMMIT:-unknown}"
+    image: aqi-platform:local
     container_name: aqi_app
     # always: перезапускать при любом сбое, включая перезагрузку сервера
     restart: always
