@@ -1,0 +1,105 @@
+.root {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logoIcon { font-size: 22px; }
+
+.logoText {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.nav {
+  flex: 1;
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  transition: background 0.15s, color 0.15s;
+  font-size: 13px;
+}
+
+.navItem:hover {
+  background: rgba(91, 141, 238, 0.1);
+  color: var(--color-text);
+}
+
+.navActive {
+  background: rgba(91, 141, 238, 0.15);
+  color: var(--color-primary);
+}
+
+.navIcon { font-size: 16px; }
+
+.userBlock {
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.userRole {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.logoutBtn {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.logoutBtn:hover {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}

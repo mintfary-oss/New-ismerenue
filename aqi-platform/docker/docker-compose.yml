@@ -5,6 +5,22 @@
 name: aqi-platform
 
 services:
+  # ── React SPA builder ───────────────────────────────────────────────────────
+  # Init-контейнер: собирает фронтенд и кладёт собранные файлы в volume spa_dist.
+  # Nginx подхватывает volume и отдаёт статику напрямую без Node.js в продакшне.
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      target: spa          # stage 2 финального Alpine-образа
+    container_name: aqi_frontend_builder
+    volumes:
+      - spa_dist:/data     # монтируем пустой volume в /data
+    # Копируем собранные файлы из /spa (image) → /data (volume)
+    command: sh -c "cp -rT /spa/ /data/"
+    # После копирования контейнер завершается — это нормально.
+    restart: "no"
+
   # ── Приложение ─────────────────────────────────────────────────────────────
   app:
     image: ghcr.io/mintfary/aqi-platform:${APP_VERSION:-latest}
@@ -122,20 +138,22 @@ services:
         limits:
           memory: 160M
 
-  # ── Nginx (reverse proxy + TLS) ────────────────────────────────────────────
+  # ── Nginx (reverse proxy + TLS + SPA) ─────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
     container_name: aqi_nginx
     restart: unless-stopped
     depends_on:
       - app
+      - frontend    # ждём копирования SPA-файлов в volume
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
     volumes:
-      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - nginx_certs:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
+      - spa_dist:/var/www/spa:ro    # собранный React SPA
     networks:
       - aqi_internal
     healthcheck:
@@ -160,6 +178,8 @@ volumes:
     driver: local
   nginx_logs:
     driver: local
+  spa_dist:
+    driver: local    # хранит собранный React SPA (заполняется frontend-сервисом)
 
 # ── Networks ───────────────────────────────────────────────────────────────
 networks:
