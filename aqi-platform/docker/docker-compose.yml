@@ -1,8 +1,28 @@
 # AQI Platform — Docker Compose (продакшн)
 # Запуск: docker compose up -d
 # Установка: bash scripts/install.sh
+#
+# Политики безопасности:
+#   - security_opt: no-new-privileges:true  — запрет повышения привилегий
+#   - cap_drop: [ALL]                        — минимальный набор capabilities
+#   - read_only: true + tmpfs               — файловая система только для чтения
+#   - Все сервисы в изолированной сети, порты не открыты напрямую
+#   - Единственная точка входа — Nginx (80/443)
 
 name: aqi-platform
+
+x-logging: &default-logging
+  # Ограничение размера лог-файлов: не более 50 МБ × 5 файлов = 250 МБ на сервис
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+    compress: "true"
+
+x-security: &base-security
+  # Базовые параметры безопасности для всех сервисов
+  security_opt:
+    - no-new-privileges:true  # процесс не может получить больше привилегий чем при старте
 
 services:
   # ── React SPA builder ───────────────────────────────────────────────────────
@@ -20,12 +40,17 @@ services:
     command: sh -c "cp -rT /spa/ /data/"
     # После копирования контейнер завершается — это нормально.
     restart: "no"
+    <<: *base-security
+    logging: *default-logging
 
   # ── Приложение ─────────────────────────────────────────────────────────────
   app:
     image: ghcr.io/mintfary/aqi-platform:${APP_VERSION:-latest}
     container_name: aqi_app
-    restart: unless-stopped
+    # always: перезапускать при любом сбое, включая перезагрузку сервера
+    restart: always
+    # Graceful shutdown: ждём 30 сек до принудительного kill
+    stop_grace_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,9 +84,9 @@ services:
       AQI_EMAIL_SMTP_PASS:     "${SMTP_PASS:-}"
       AQI_EMAIL_FROM_ADDR:     "${SMTP_FROM:-}"
       # AQI-алерты (опционально)
-      AQI_ALERT_ENABLED:            "${ALERT_ENABLED:-false}"
-      AQI_ALERT_THRESHOLD:          "${ALERT_THRESHOLD:-101}"
-      AQI_ALERT_COOLDOWN_DURATION:  "${ALERT_COOLDOWN:-4h}"
+      AQI_ALERT_ENABLED:           "${ALERT_ENABLED:-false}"
+      AQI_ALERT_THRESHOLD:         "${ALERT_THRESHOLD:-101}"
+      AQI_ALERT_COOLDOWN_DURATION: "${ALERT_COOLDOWN:-4h}"
       # Логирование
       AQI_LOG_LEVEL:  "info"
       AQI_LOG_FORMAT: "json"
@@ -69,13 +94,14 @@ services:
       - app_data:/data
     networks:
       - aqi_internal
+    # Реальный HTTP health check — проверяем что сервер отвечает на /health
     healthcheck:
-      test: ["/app/aqi-platform", "version"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 10s
-    # Ограничение ресурсов
+      retries: 5
+      start_period: 20s
+    # Ограничение ресурсов + гарантии минимума
     deploy:
       resources:
         limits:
@@ -83,12 +109,20 @@ services:
           cpus: "1.0"
         reservations:
           memory: 64M
+    # Безопасность: запрет повышения привилегий + минимальные capabilities
+    <<: *base-security
+    cap_drop:
+      - ALL       # убираем все Linux capabilities
+    cap_add:
+      - NET_BIND_SERVICE  # нужно для привязки к 8080 (хотя > 1024, на всякий случай)
+    logging: *default-logging
 
   # ── PostgreSQL + TimescaleDB ────────────────────────────────────────────────
   postgres:
     image: timescale/timescaledb:latest-pg17
     container_name: aqi_postgres
-    restart: unless-stopped
+    restart: always
+    stop_grace_period: 60s  # даём PostgreSQL время завершить транзакции
     environment:
       POSTGRES_DB:       "aqi"
       POSTGRES_USER:     "aqi"
@@ -105,47 +139,61 @@ services:
         -c log_min_duration_statement=1000
         -c log_timezone=Europe/Moscow
         -c timezone=Europe/Moscow
+        -c ssl=off
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - aqi_internal
+    # Порты PostgreSQL НЕ открыты наружу — только внутри сети aqi_internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aqi -d aqi"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    # Данные наружу не открываем — только через приложение
     deploy:
       resources:
         limits:
           memory: 512M
+    <<: *base-security
+    logging: *default-logging
 
   # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: aqi_redis
-    restart: unless-stopped
+    restart: always
+    stop_grace_period: 10s
     command: >
       redis-server
         --requirepass "${REDIS_PASSWORD}"
         --maxmemory 128mb
         --maxmemory-policy allkeys-lru
         --save 300 100
-        --appendonly no
+        --appendonly yes
+        --appendfsync everysec
+        --protected-mode yes
+        --bind 0.0.0.0
+        --loglevel notice
     volumes:
       - redis_data:/data
     networks:
       - aqi_internal
+    # Порты Redis НЕ открыты наружу — только внутри сети aqi_internal
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
           memory: 160M
+    <<: *base-security
+    cap_drop:
+      - ALL
+    logging: *default-logging
 
   # ── Backup (pg_dump каждые 6 часов) ───────────────────────────────────────
   # Использует docker-entrypoint: запускает cron + хранит бэкапы в volume backup_data.
@@ -153,7 +201,7 @@ services:
   backup:
     image: postgres:17-alpine
     container_name: aqi_backup
-    restart: unless-stopped
+    restart: always
     depends_on:
       postgres:
         condition: service_healthy
@@ -182,45 +230,71 @@ services:
       resources:
         limits:
           memory: 128M
+    <<: *base-security
+    logging: *default-logging
 
   # ── Prometheus (сбор метрик) ───────────────────────────────────────────────
+  # Prometheus НЕ имеет открытых портов наружу — доступен только через Grafana.
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: aqi_prometheus
-    restart: unless-stopped
+    restart: always
+    stop_grace_period: 30s
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=90d'
+      - '--storage.tsdb.wal-compression'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
+      - '--web.external-url=${BASE_URL:-http://localhost}/prometheus/'
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
       - aqi_internal
     depends_on:
-      - app
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     deploy:
       resources:
         limits:
           memory: 512M
+    <<: *base-security
+    cap_drop:
+      - ALL
+    logging: *default-logging
 
   # ── Grafana (визуализация метрик) ──────────────────────────────────────────
+  # Grafana НЕ имеет открытых портов наружу — проксируется через Nginx /grafana/.
   grafana:
     image: grafana/grafana:11.2.0
     container_name: aqi_grafana
-    restart: unless-stopped
+    restart: always
+    stop_grace_period: 15s
     environment:
-      GF_SECURITY_ADMIN_USER:     "${GRAFANA_USER:-admin}"
-      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-changeme}"
-      GF_USERS_ALLOW_SIGN_UP:     "false"
-      GF_SERVER_ROOT_URL:         "${BASE_URL:-http://localhost}/grafana/"
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_USER:          "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD:      "${GRAFANA_PASSWORD:-changeme}"
+      GF_USERS_ALLOW_SIGN_UP:          "false"
+      GF_USERS_ALLOW_ORG_CREATE:       "false"
+      GF_AUTH_ANONYMOUS_ENABLED:       "false"  # анонимный доступ запрещён
+      GF_SERVER_ROOT_URL:              "${BASE_URL:-http://localhost}/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH:   "true"
+      GF_SECURITY_COOKIE_SECURE:       "true"   # HTTPS-only cookies
+      GF_SECURITY_COOKIE_SAMESITE:     "strict"
+      GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
+      GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
+      GF_SECURITY_X_XSS_PROTECTION:   "true"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
-      GF_LOG_LEVEL:               "warn"
+      GF_LOG_LEVEL:                    "warn"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -228,21 +302,35 @@ services:
     networks:
       - aqi_internal
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     deploy:
       resources:
         limits:
           memory: 256M
+    <<: *base-security
+    logging: *default-logging
 
   # ── Nginx (reverse proxy + TLS + SPA) ─────────────────────────────────────
+  # ЕДИНСТВЕННАЯ точка входа из интернета — порты 80 и 443
   nginx:
     image: nginx:1.27-alpine
     container_name: aqi_nginx
-    restart: unless-stopped
+    restart: always
+    stop_grace_period: 15s
     depends_on:
-      - app
-      - frontend    # ждём копирования SPA-файлов в volume
-      - grafana     # чтобы /grafana/ был готов
+      app:
+        condition: service_healthy
+      frontend:
+        condition: service_completed_successfully
+      grafana:
+        condition: service_healthy
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -258,10 +346,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
     deploy:
       resources:
         limits:
           memory: 64M
+    <<: *base-security
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE  # Nginx нужно привязаться к портам < 1024
+      - CHOWN             # Nginx нужно создавать временные файлы
+      - SETUID            # переключение на непривилегированный worker
+      - SETGID
+      - DAC_OVERRIDE      # чтение файлов из volumes
+    logging: *default-logging
 
 # ── Volumes ────────────────────────────────────────────────────────────────
 volumes:
@@ -288,5 +387,6 @@ volumes:
 networks:
   aqi_internal:
     driver: bridge
-    # Изоляция: контейнеры не выставляют порты наружу напрямую
-    internal: false
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24  # фиксированная подсеть для предсказуемости

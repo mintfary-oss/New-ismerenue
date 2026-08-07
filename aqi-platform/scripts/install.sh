@@ -228,6 +228,113 @@ print_summary() {
   echo ""
 }
 
+# ── Установка systemd сервисов (watchdog + автозапуск) ────────────────────
+setup_systemd() {
+  if ! command -v systemctl &>/dev/null; then
+    warn "systemd не найден — автозапуск не настроен"
+    return
+  fi
+
+  info "Устанавливаю systemd сервисы..."
+
+  # Основной сервис
+  cat > /etc/systemd/system/aqi-platform.service << EOF
+[Unit]
+Description=AQI Platform
+Requires=docker.service
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=/usr/bin/docker compose -f ${INSTALL_DIR}/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-directory ${INSTALL_DIR} up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f ${INSTALL_DIR}/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-directory ${INSTALL_DIR} down
+Restart=on-failure
+RestartSec=30s
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Watchdog сервис
+  cat > /etc/systemd/system/aqi-watchdog.service << EOF
+[Unit]
+Description=AQI Platform Watchdog
+After=aqi-platform.service
+Requires=aqi-platform.service
+
+[Service]
+Type=simple
+ExecStart=/bin/bash ${INSTALL_DIR}/scripts/watchdog.sh
+Restart=always
+RestartSec=10s
+StandardOutput=append:/var/log/aqi-watchdog.log
+StandardError=append:/var/log/aqi-watchdog.log
+Environment="COMPOSE_FILE=${INSTALL_DIR}/docker/docker-compose.yml"
+Environment="ENV_FILE=${INSTALL_DIR}/.env"
+Environment="PROJECT_DIR=${INSTALL_DIR}"
+Environment="LOG_FILE=/var/log/aqi-watchdog.log"
+Environment="CHECK_INTERVAL=30"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Healthcheck таймер
+  cat > /etc/systemd/system/aqi-healthcheck.service << EOF
+[Unit]
+Description=AQI Platform Health Check
+After=aqi-platform.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${INSTALL_DIR}/scripts/healthcheck.sh
+StandardOutput=append:/var/log/aqi-healthcheck.log
+StandardError=append:/var/log/aqi-healthcheck.log
+Environment="ENV_FILE=${INSTALL_DIR}/.env"
+EOF
+
+  cat > /etc/systemd/system/aqi-healthcheck.timer << EOF
+[Unit]
+Description=AQI Platform Health Check Timer
+After=aqi-platform.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+
+  # Ротация логов
+  cat > /etc/logrotate.d/aqi-platform << EOF
+/var/log/aqi-watchdog.log /var/log/aqi-healthcheck.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+
+  # Копируем скрипты
+  cp "$(dirname "$0")/watchdog.sh"    "$INSTALL_DIR/scripts/watchdog.sh"
+  cp "$(dirname "$0")/healthcheck.sh" "$INSTALL_DIR/scripts/healthcheck.sh"
+  chmod +x "$INSTALL_DIR/scripts/watchdog.sh" "$INSTALL_DIR/scripts/healthcheck.sh"
+
+  systemctl daemon-reload
+  systemctl enable aqi-platform.service
+  systemctl enable aqi-watchdog.service
+  systemctl enable aqi-healthcheck.timer
+
+  success "Systemd сервисы установлены (watchdog + автозапуск)"
+}
+
 # ── Основной поток выполнения ─────────────────────────────────────────────
 main() {
   install_docker
@@ -236,6 +343,7 @@ main() {
   setup_files
   start_platform
   health_check
+  setup_systemd
   print_summary
 }
 
