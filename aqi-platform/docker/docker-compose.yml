@@ -53,6 +53,15 @@ services:
       AQI_EMAIL_IMAP_HOST:     "${IMAP_HOST:-}"
       AQI_EMAIL_IMAP_USER:     "${IMAP_USER:-}"
       AQI_EMAIL_IMAP_PASSWORD: "${IMAP_PASSWORD:-}"
+      AQI_EMAIL_SMTP_HOST:     "${SMTP_HOST:-}"
+      AQI_EMAIL_SMTP_PORT:     "${SMTP_PORT:-587}"
+      AQI_EMAIL_SMTP_USER:     "${SMTP_USER:-}"
+      AQI_EMAIL_SMTP_PASS:     "${SMTP_PASS:-}"
+      AQI_EMAIL_FROM_ADDR:     "${SMTP_FROM:-}"
+      # AQI-алерты (опционально)
+      AQI_ALERT_ENABLED:            "${ALERT_ENABLED:-false}"
+      AQI_ALERT_THRESHOLD:          "${ALERT_THRESHOLD:-101}"
+      AQI_ALERT_COOLDOWN_DURATION:  "${ALERT_COOLDOWN:-4h}"
       # Логирование
       AQI_LOG_LEVEL:  "info"
       AQI_LOG_FORMAT: "json"
@@ -174,6 +183,57 @@ services:
         limits:
           memory: 128M
 
+  # ── Prometheus (сбор метрик) ───────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: aqi_prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - aqi_internal
+    depends_on:
+      - app
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ── Grafana (визуализация метрик) ──────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: aqi_grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER:     "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-changeme}"
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_SERVER_ROOT_URL:         "${BASE_URL:-http://localhost}/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_LEVEL:               "warn"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - aqi_internal
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   # ── Nginx (reverse proxy + TLS + SPA) ─────────────────────────────────────
   nginx:
     image: nginx:1.27-alpine
@@ -182,6 +242,7 @@ services:
     depends_on:
       - app
       - frontend    # ждём копирования SPA-файлов в volume
+      - grafana     # чтобы /grafana/ был готов
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
@@ -218,6 +279,10 @@ volumes:
     driver: local    # хранит собранный React SPA (заполняется frontend-сервисом)
   backup_data:
     driver: local    # хранит pg_dump-бэкапы (30 дней)
+  prometheus_data:
+    driver: local    # хранит TSDB Prometheus (90 дней метрик)
+  grafana_data:
+    driver: local    # хранит настройки и кастомные дашборды Grafana
 
 # ── Networks ───────────────────────────────────────────────────────────────
 networks:

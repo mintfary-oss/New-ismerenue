@@ -239,6 +239,45 @@
   font-size: 13px;
 }
 
+/* ── Мобильные стили ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tabBtn {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+  .table th,
+  .table td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tabBtn span:first-child {
+    display: none; /* скрываем иконку на очень маленьких экранах */
+  }
+  .formActions {
+    flex-direction: column;
+  }
+  .btnPrimary,
+  .btnGhost {
+    width: 100%;
+  }
+}
+
 /* Бейджи */
 .badge {
   padding: 2px 8px;

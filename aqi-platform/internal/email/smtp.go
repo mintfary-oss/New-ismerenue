@@ -31,6 +31,21 @@ func (s *Sender) IsConfigured() bool {
 	return s.cfg.SMTPHost != ""
 }
 
+// SendAQIAlert отправляет уведомление о превышении порога AQI нескольким получателям.
+// data — структура AQIAlertData из service-пакета (импортировать нельзя из-за цикла,
+// поэтому принимаем готовое HTML-тело через параметр htmlBody).
+func (s *Sender) SendAQIAlertHTML(to []string, subject, htmlBody string) error {
+	if !s.IsConfigured() {
+		return nil
+	}
+	for _, addr := range to {
+		if err := s.send(addr, subject, htmlBody); err != nil {
+			return fmt.Errorf("smtp: SendAQIAlertHTML to %s: %w", addr, err)
+		}
+	}
+	return nil
+}
+
 // SendPasswordReset отправляет письмо со ссылкой для сброса пароля.
 func (s *Sender) SendPasswordReset(toEmail, resetToken, baseURL string) error {
 	if !s.IsConfigured() {

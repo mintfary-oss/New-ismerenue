@@ -404,6 +404,45 @@
 
 Репозиторий актуален (97579d3). Выполнен **Sprint 9**.
 
+---
+
+## СООБЩЕНИЕ 17 — ПОЛЬЗОВАТЕЛЬ
+
+> Обнови репозиторий и давай дальше
+
+---
+
+## ОТВЕТ 17 — NEO
+
+Репозиторий обновлён. Выполнен **Sprint 10** — Grafana + AQI Алерты + Мобильная адаптация.
+
+**1. Grafana + Prometheus в Docker Compose:**
+- Добавлены сервисы `prometheus` (prom/prometheus:v2.54.1) и `grafana` (grafana/grafana:11.2.0) в `docker-compose.yml`
+- `docker/prometheus/prometheus.yml` — конфиг Prometheus с scrape на `app:8080/metrics`, retention 90 дней
+- `docker/grafana/provisioning/datasources/prometheus.yml` — автоподключение Prometheus DS
+- `docker/grafana/provisioning/dashboards/default.yml` — автозагрузка дашбордов из папки
+- `docker/grafana/dashboards/aqi-platform.json` — готовый дашборд (12 панелей): AQI Gauge, история AQI, HTTP RPS, P95 latency, датчики онлайн, IMAP polls, время прогноза, Go heap
+- Nginx проксирует `/grafana/` → Grafana с WebSocket поддержкой
+- `install.sh` генерирует `GRAFANA_PASSWORD` и показывает URL при установке
+
+**2. AQI Алерты (Go-сервис):**
+- `internal/service/alert_service.go` — `AlertService` с порогами, кулдауном (4ч), HTML email
+- `internal/config/config.go` — новый `AlertConfig` (enabled, recipients, threshold, cooldown)
+- `internal/email/smtp.go` — добавлен метод `SendAQIAlertHTML`
+- `cmd/aqi-platform/main.go` — `alertSenderAdapter` (без цикла импортов), подключён к scheduler
+- `internal/scheduler/scheduler.go` — после каждого прогноза запускается `alert.Check(ctx)`
+- `docker-compose.yml` — env-переменные `AQI_ALERT_ENABLED`, `AQI_ALERT_THRESHOLD`, SMTP конфиг
+
+**3. Мобильная адаптация фронтенда:**
+- `Layout.tsx` — гамбургер-кнопка (`☰`/`✕`), оверлей, закрытие меню при навигации и клике вне
+- `Layout.module.css` — `topbar` (высота 52px), CSS-анимация сайдбара (`translateX`), breakpoints 768px / 1024px
+- `DashboardPage.module.css` — responsive grid 2 колонки на мобильном
+- `AdminPage.module.css` — горизонтальный скролл для вкладок, grid 1 колонки на мобильном
+- `MapPage.module.css` — popup снизу на мобильном, уменьшенная легенда
+- `LoginPage.module.css` — меньший padding на маленьких экранах
+
+`go build ✅` | `go vet ✅` | `go test ./... ✅` (73 теста PASS) | `tsc --noEmit ✅`
+
 **1. Prometheus metrics** (`internal/metrics/metrics.go`):
 - `/metrics` эндпоинт (Prometheus scrape)
 - Middleware для всех HTTP-запросов: `aqi_http_requests_total`, `aqi_http_request_duration_seconds`, `aqi_http_active_connections`

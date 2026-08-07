@@ -95,6 +95,8 @@ generate_secrets() {
   REDIS_PASSWORD=$(openssl rand -base64 24 | tr -d '/=+' | cut -c1-24)
   # JWT секрет: минимум 32 символа по требованию конфигурации
   JWT_SECRET=$(openssl rand -base64 64 | tr -d '/=+' | cut -c1-64)
+  # Grafana admin password
+  GRAFANA_PASSWORD=$(openssl rand -base64 20 | tr -d '/=+' | cut -c1-20)
 
   success "Секреты сгенерированы"
 }
@@ -118,6 +120,10 @@ HTTPS_PORT=443
 DB_PASSWORD=${DB_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
+
+# Grafana
+GRAFANA_USER=admin
+GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
 
 # Заполните для email-интеграции:
 IMAP_HOST=
@@ -207,13 +213,15 @@ print_summary() {
   echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════╝${NC}"
   echo ""
   echo -e "  ${BOLD}Адрес платформы:${NC}  http://$ip"
+  echo -e "  ${BOLD}Grafana (мониторинг):${NC}  http://$ip/grafana/  (login: admin / ${GRAFANA_PASSWORD})"
   echo -e "  ${BOLD}Установочная директория:${NC} $INSTALL_DIR"
   echo -e "  ${BOLD}Логи:${NC}  docker compose -f $INSTALL_DIR/docker/docker-compose.yml logs -f"
   echo ""
   echo -e "  ${YELLOW}Следующие шаги:${NC}"
   echo -e "  1. Войдите на http://$ip и смените пароль администратора"
   echo -e "  2. Добавьте датчики в разделе Настройки → Датчики"
-  echo -e "  3. Получите TLS сертификат (Let's Encrypt) для HTTPS"
+  echo -e "  3. Откройте Grafana на http://$ip/grafana/ для мониторинга метрик"
+  echo -e "  4. Получите TLS сертификат (Let's Encrypt) для HTTPS"
   echo ""
   echo -e "  ${BOLD}Конфигурация хранится в:${NC} $INSTALL_DIR/.env"
   echo -e "  ${RED}ВАЖНО: не передавайте .env файл посторонним лицам!${NC}"

@@ -172,3 +172,33 @@
   color: #fc8181;
   font-size: 11px;
 }
+
+/* ── Мобильные стили ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .root {
+    gap: 20px;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cardAqi {
+    font-size: 28px;
+  }
+
+  .chartWrap {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cards {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pageTitle {
+    font-size: 17px;
+  }
+}

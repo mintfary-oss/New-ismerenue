@@ -114,3 +114,10 @@
   font-size: 11px;
   color: var(--color-text-muted);
 }
+
+@media (max-width: 480px) {
+  .card {
+    padding: 28px 20px;
+    border-radius: 8px;
+  }
+}

@@ -163,14 +163,23 @@ func runServer(ctx context.Context, configPath string) error {
 	forecastSvc := service.NewForecastService(measurementRepo, forecastRepo, cfg.Forecast, logger)
 	tokenSvc := service.NewTokenService(tokenRepo, userRepo, cfg.Auth.JWTSecret, logger)
 
-	// ── 8. Планировщик фоновых задач ─────────────────────────────────────
-	sched := scheduler.New(forecastSvc, measurementRepo, forecastRepo, cfg.Forecast, logger)
-	go sched.Start(ctx)
+	// ── 8. Email-отправитель (SMTP) ───────────────────────────────────────
+	smtpSender := email.NewSender(cfg.Email)
 
 	// ── 8a. IMAP-приёмник данных с датчиков ───────────────────────────────
 	// Опрашивает почтовый ящик и загружает CSV-вложения с измерениями.
 	imapReceiver := email.New(cfg.Email, measureSvc, logger)
 	go imapReceiver.Start(ctx)
+
+	// ── 8b. AQI-алерты ────────────────────────────────────────────────────
+	alertAdapter := &alertSenderAdapter{sender: smtpSender}
+	alertSvc := service.NewAlertService(
+		measurementRepo, alertAdapter, cfg.Alert, cfg.Server.BaseURL, logger,
+	)
+
+	// ── 8c. Планировщик фоновых задач ─────────────────────────────────────
+	sched := scheduler.New(forecastSvc, alertSvc, measurementRepo, forecastRepo, cfg.Forecast, logger)
+	go sched.Start(ctx)
 
 	// ── 9. HTTP-обработчики ───────────────────────────────────────────────
 	handlers := handler.NewHandlers(handler.Deps{
@@ -233,6 +242,27 @@ func runMigrate(_ context.Context, configPath, direction string) error {
 
 	fmt.Println("Миграции применены успешно")
 	return nil
+}
+
+// ── alertSenderAdapter ─────────────────────────────────────────────────────
+// Адаптер, реализующий service.AlertEmailSender через *email.Sender.
+// Живёт в main-пакете, чтобы избежать цикла импортов email↔service.
+
+type alertSenderAdapter struct {
+	sender *email.Sender
+}
+
+func (a *alertSenderAdapter) IsConfigured() bool {
+	return a.sender.IsConfigured()
+}
+
+func (a *alertSenderAdapter) SendAQIAlert(to []string, data service.AQIAlertData) error {
+	htmlBody, err := service.RenderAQIAlertEmail(data)
+	if err != nil {
+		return err
+	}
+	subject := fmt.Sprintf("⚠️ AQI %d — %s (%s)", data.AQI, data.Category, data.District)
+	return a.sender.SendAQIAlertHTML(to, subject, htmlBody)
 }
 
 // buildLogger создаёт slog.Logger с заданными параметрами.

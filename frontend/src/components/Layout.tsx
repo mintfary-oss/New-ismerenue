@@ -1,5 +1,6 @@
-// Основной Layout: сайдбар + контент
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+// Основной Layout: сайдбар + контент + мобильное меню-бургер
+import { useState, useEffect } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { logout } from '../api/auth';
 import styles from './Layout.module.css';
@@ -17,6 +18,28 @@ const ADMIN_ITEMS = [
 export default function Layout() {
   const { user, clearAuth, hasRole } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Закрываем меню при смене маршрута (для мобильных)
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  // Закрываем меню при клике вне сайдбара
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      const sidebar = document.getElementById('sidebar');
+      const burger = document.getElementById('burger-btn');
+      if (sidebar && !sidebar.contains(e.target as Node) &&
+          burger && !burger.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
 
   async function handleLogout() {
     try { await logout(); } catch { /* ignore */ }
@@ -26,7 +49,34 @@ export default function Layout() {
 
   return (
     <div className={styles.root}>
-      <aside className={styles.sidebar}>
+      {/* ── Мобильная шапка (topbar) ── */}
+      <header className={styles.topbar}>
+        <button
+          id="burger-btn"
+          className={styles.burgerBtn}
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-label="Открыть меню"
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? '✕' : '☰'}
+        </button>
+        <span className={styles.topbarTitle}>🌫️ AQI Кемерово</span>
+      </header>
+
+      {/* ── Затемнение фона на мобильном при открытом меню ── */}
+      {menuOpen && (
+        <div
+          className={styles.overlay}
+          onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Сайдбар ── */}
+      <aside
+        id="sidebar"
+        className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`}
+      >
         <div className={styles.logo}>
           <span className={styles.logoIcon}>🌫️</span>
           <span className={styles.logoText}>AQI Кемерово</span>

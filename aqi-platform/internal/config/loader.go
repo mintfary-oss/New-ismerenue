@@ -97,6 +97,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("forecast.idw_power", 2.0)
 	v.SetDefault("forecast.min_sensors_for_forecast", 1)
 
+	// Alert
+	v.SetDefault("alert.enabled", false)
+	v.SetDefault("alert.threshold", 101)               // Unhealthy for Sensitive Groups
+	v.SetDefault("alert.cooldown_duration", 4*time.Hour)
+	v.SetDefault("alert.check_interval", 20*time.Minute)
+
 	// Log
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.format", "json")

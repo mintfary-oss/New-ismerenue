@@ -16,6 +16,11 @@ type ForecastRunner interface {
 	Run(ctx context.Context) error
 }
 
+// AlertChecker — интерфейс для проверки AQI-порогов и отправки алертов.
+type AlertChecker interface {
+	Check(ctx context.Context)
+}
+
 // RetentionCleaner — интерфейс удаления устаревших данных.
 type RetentionCleaner interface {
 	// DeleteOlderThan удаляет записи старше заданного момента времени.
@@ -25,27 +30,30 @@ type RetentionCleaner interface {
 
 // Scheduler управляет фоновыми задачами платформы.
 type Scheduler struct {
-	forecast        ForecastRunner
-	measurements    RetentionCleaner
+	forecast         ForecastRunner
+	alert            AlertChecker
+	measurements     RetentionCleaner
 	forecastsCleaner RetentionCleaner
-	cfg             config.ForecastConfig
-	logger          *slog.Logger
+	cfg              config.ForecastConfig
+	logger           *slog.Logger
 }
 
 // New создаёт планировщик задач.
 func New(
 	forecast ForecastRunner,
+	alert AlertChecker,
 	measurements RetentionCleaner,
 	forecastsCleaner RetentionCleaner,
 	cfg config.ForecastConfig,
 	logger *slog.Logger,
 ) *Scheduler {
 	return &Scheduler{
-		forecast:        forecast,
-		measurements:    measurements,
+		forecast:         forecast,
+		alert:            alert,
+		measurements:     measurements,
 		forecastsCleaner: forecastsCleaner,
-		cfg:             cfg,
-		logger:          logger,
+		cfg:              cfg,
+		logger:           logger,
 	}
 }
 
@@ -90,7 +98,7 @@ func (s *Scheduler) forecastLoop(ctx context.Context, interval time.Duration) {
 	}
 }
 
-// runForecast выполняет один цикл расчёта прогноза.
+// runForecast выполняет один цикл расчёта прогноза, затем проверяет алерты.
 func (s *Scheduler) runForecast(ctx context.Context) {
 	start := time.Now()
 	metrics.ForecastRunsTotal.Inc()
@@ -104,6 +112,10 @@ func (s *Scheduler) runForecast(ctx context.Context) {
 	dur := time.Since(start)
 	metrics.ForecastRunDuration.Observe(dur.Seconds())
 	s.logger.Info("расчёт прогноза: успешно", "duration", dur.Round(time.Millisecond))
+
+	// После успешного прогноза проверяем AQI-алерты.
+	// Запускаем в горутине, чтобы не задерживать следующий тик.
+	go s.alert.Check(ctx)
 }
 
 // retentionLoop выполняет удаление устаревших данных раз в сутки.

@@ -12,7 +12,28 @@ type Config struct {
 	Auth     AuthConfig     `mapstructure:"auth"`
 	Email    EmailConfig    `mapstructure:"email"`
 	Forecast ForecastConfig `mapstructure:"forecast"`
+	Alert    AlertConfig    `mapstructure:"alert"`
 	Log      LogConfig      `mapstructure:"log"`
+}
+
+// AlertConfig — параметры AQI-алертов (email-уведомления при превышении порогов).
+type AlertConfig struct {
+	// Enabled — включить систему алертов.
+	Enabled bool `mapstructure:"enabled"`
+
+	// Recipients — список email-адресов получателей уведомлений.
+	Recipients []string `mapstructure:"recipients"`
+
+	// Threshold — минимальный AQI для отправки алерта (включительно).
+	// Default: 101 (уровень "Нездоровое для чувствительных групп").
+	Threshold int `mapstructure:"threshold"`
+
+	// CooldownDuration — минимальное время между повторными алертами
+	// для одной и той же точки мониторинга (во избежание спама).
+	CooldownDuration time.Duration `mapstructure:"cooldown_duration"`
+
+	// CheckInterval — как часто проверять AQI-значения.
+	CheckInterval time.Duration `mapstructure:"check_interval"`
 }
 
 // ServerConfig — параметры HTTP-сервера.

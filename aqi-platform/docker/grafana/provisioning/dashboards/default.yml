@@ -1,0 +1,15 @@
+# Grafana — автоматическая загрузка дашбордов из папки /var/lib/grafana/dashboards.
+# Все JSON-файлы в указанной папке будут добавлены как дашборды.
+
+apiVersion: 1
+
+providers:
+  - name: 'AQI Platform'
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
