@@ -218,22 +218,23 @@ if [[ ! -f "$INSTALL_DIR/docker/nginx/ssl/cert.pem" ]]; then
 fi
 
 # ── Шаг 5: Сборка образов из исходников ──────────────────────────────────────
-step "Шаг 5/7: Сборка приложения (займёт 3–10 минут)"
+step "Шаг 5/7: Сборка приложения (займёт 5–15 минут)"
 info "Собираю Go-бэкенд и React-фронтенд из исходного кода..."
-info "Интернет нужен только для загрузки golang:alpine, node:alpine, postgres, redis, nginx с Docker Hub"
+info "Интернет нужен только для загрузки базовых образов с Docker Hub (golang, node, alpine, postgres, redis, nginx)"
+echo ""
 
-# Сборка: Go API + React SPA
-docker compose \
-  -f "$INSTALL_DIR/docker/docker-compose.yml" \
+# ВАЖНО: контекст сборки должен быть в SOURCE_DIR/aqi-platform/
+# где лежат go.mod, cmd/, internal/ и frontend/
+# docker-compose.yml использует context: .. что = aqi-platform/ относительно docker/
+export DOCKER_BUILDKIT=1
+
+if ! docker compose \
+  -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
   --env-file "$INSTALL_DIR/.env" \
-  --project-directory "$INSTALL_DIR" \
-  build --no-cache 2>&1 | while IFS= read -r line; do
-    # Показываем только значимые строки (не спам от npm/go)
-    case "$line" in
-      *"Step "*|*"COPY"*|*"RUN"*|*"FROM"*|*" ---> "*|*"Successfully"*|*"Error"*|*"error"*)
-        echo "    $line" ;;
-    esac
-  done
+  --project-name aqi-platform \
+  build --no-cache; then
+  error "Сборка завершилась с ошибкой. Проверьте вывод выше."
+fi
 
 success "Образы собраны локально"
 
@@ -241,9 +242,9 @@ success "Образы собраны локально"
 step "Шаг 6/7: Запуск"
 
 docker compose \
-  -f "$INSTALL_DIR/docker/docker-compose.yml" \
+  -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
   --env-file "$INSTALL_DIR/.env" \
-  --project-directory "$INSTALL_DIR" \
+  --project-name aqi-platform \
   up -d --remove-orphans
 
 success "Контейнеры запущены"
@@ -264,8 +265,8 @@ After=docker.service network-online.target
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/docker compose -f ${INSTALL_DIR}/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-directory ${INSTALL_DIR} up -d --remove-orphans
-ExecStop=/usr/bin/docker compose -f ${INSTALL_DIR}/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-directory ${INSTALL_DIR} down
+ExecStart=/usr/bin/docker compose -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-name aqi-platform up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml --env-file ${INSTALL_DIR}/.env --project-name aqi-platform down
 Restart=on-failure
 RestartSec=30s
 TimeoutStartSec=300
@@ -283,14 +284,14 @@ Requires=aqi-platform.service
 
 [Service]
 Type=simple
-ExecStart=/bin/bash ${INSTALL_DIR}/scripts/watchdog.sh
+ExecStart=/bin/bash ${SOURCE_DIR}/aqi-platform/scripts/watchdog.sh
 Restart=always
 RestartSec=10s
 StandardOutput=append:/var/log/aqi-watchdog.log
 StandardError=append:/var/log/aqi-watchdog.log
-Environment="COMPOSE_FILE=${INSTALL_DIR}/docker/docker-compose.yml"
+Environment="COMPOSE_FILE=${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml"
 Environment="ENV_FILE=${INSTALL_DIR}/.env"
-Environment="PROJECT_DIR=${INSTALL_DIR}"
+Environment="PROJECT_DIR=${SOURCE_DIR}/aqi-platform"
 Environment="LOG_FILE=/var/log/aqi-watchdog.log"
 Environment="CHECK_INTERVAL=30"
 
@@ -326,7 +327,7 @@ if ! grep -q 'alias aqi=' /root/.bashrc 2>/dev/null; then
   cat >> /root/.bashrc <<'ALIAS_EOF'
 
 # AQI Platform — управление
-alias aqi='docker compose -f /opt/aqi-platform/docker/docker-compose.yml --env-file /opt/aqi-platform/.env --project-directory /opt/aqi-platform'
+alias aqi='docker compose -f /opt/aqi-source/aqi-platform/docker/docker-compose.yml --env-file /opt/aqi-platform/.env --project-name aqi-platform'
 ALIAS_EOF
 fi
 
