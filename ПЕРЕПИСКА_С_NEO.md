@@ -247,3 +247,23 @@
 **Итог:** 45 Go-файлов, 7143 строк | `go build ✅` | `go vet ✅`
 
 ---
+
+## СООБЩЕНИЕ 9 — ПОЛЬЗОВАТЕЛЬ
+
+> 07:03 проверь обнови репозиторий
+
+---
+
+## ОТВЕТ 9 — NEO
+
+Выявлено: удалённый репозиторий уже содержал коммит c829df1 (частичный Sprint 4 из предыдущей сессии). Синхронизировался и добавил:
+
+**Добавлено поверх c829df1:**
+- `internal/email/receiver.go` — IMAP-приёмник (polling каждые 5 мин, парсинг CSV, IngestBatch)
+- `internal/server/router.go` — полная RBAC-матрица (Users/Ingest/Reports/Stats/Sensors write)
+- `go.mod` — добавлен `github.com/emersion/go-imap v1.2.1`
+- `main.go` — wire IMAP receiver
+
+**Итог:** 46 Go-файлов, 7457 строк | `go build ✅` | `go vet ✅`
+
+---

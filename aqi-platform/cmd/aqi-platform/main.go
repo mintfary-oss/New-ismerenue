@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/mintfary/aqi-platform/internal/config"
+	"github.com/mintfary/aqi-platform/internal/email"
 	"github.com/mintfary/aqi-platform/internal/handler"
 	"github.com/mintfary/aqi-platform/internal/repository"
 	"github.com/mintfary/aqi-platform/internal/scheduler"
@@ -165,6 +166,11 @@ func runServer(ctx context.Context, configPath string) error {
 	// ── 8. Планировщик фоновых задач ─────────────────────────────────────
 	sched := scheduler.New(forecastSvc, measurementRepo, forecastRepo, cfg.Forecast, logger)
 	go sched.Start(ctx)
+
+	// ── 8a. IMAP-приёмник данных с датчиков ───────────────────────────────
+	// Опрашивает почтовый ящик и загружает CSV-вложения с измерениями.
+	imapReceiver := email.New(cfg.Email, measureSvc, logger)
+	go imapReceiver.Start(ctx)
 
 	// ── 9. HTTP-обработчики ───────────────────────────────────────────────
 	handlers := handler.NewHandlers(handler.Deps{
