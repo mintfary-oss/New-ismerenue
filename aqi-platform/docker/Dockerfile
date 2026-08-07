@@ -6,6 +6,10 @@ FROM golang:1.23-alpine AS go-builder
 # Устанавливаем git (нужен для go mod download с VCS)
 RUN apk add --no-cache git ca-certificates tzdata
 
+# Используем китайский/российский прокси для Go-модулей (proxy.golang.org недоступен из РФ)
+ENV GOPROXY=https://goproxy.cn,https://goproxy.io,direct
+ENV GONOSUMDB=*
+
 WORKDIR /build
 
 # Кешируем зависимости отдельным слоем
