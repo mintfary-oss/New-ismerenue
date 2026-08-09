@@ -117,8 +117,10 @@ step "Шаг 3/7: Получение исходного кода"
 
 if [[ -d "$SOURCE_DIR/.git" ]]; then
   info "Репозиторий уже существует, обновляю..."
-  git -C "$SOURCE_DIR" pull --ff-only 2>/dev/null || {
-    warn "Не удалось обновить, использую существующую версию"
+  # fetch + reset гарантирует чистое обновление даже при локальных изменениях
+  git -C "$SOURCE_DIR" fetch --depth 1 origin main 2>/dev/null && \
+    git -C "$SOURCE_DIR" reset --hard origin/main 2>/dev/null || {
+    warn "Не удалось обновить репозиторий, использую существующую версию"
   }
   success "Исходный код актуален: $SOURCE_DIR"
 else
@@ -145,17 +147,24 @@ chmod +x "$INSTALL_DIR/scripts/"*.sh
 
 success "Конфигурация скопирована в $INSTALL_DIR"
 
-# Генерируем секреты (cryptographically random)
-info "Генерирую секреты..."
-DB_PASSWORD=$(openssl rand -base64 32 | tr -d '/=+' | cut -c1-32)
-REDIS_PASSWORD=$(openssl rand -base64 24 | tr -d '/=+' | cut -c1-24)
-JWT_SECRET=$(openssl rand -base64 64 | tr -d '/=+' | cut -c1-64)
-GRAFANA_PASSWORD=$(openssl rand -base64 20 | tr -d '/=+' | cut -c1-20)
-
 SERVER_IP=$(hostname -I | awk '{print $1}')
 
-# Создаём .env файл
-cat > "$INSTALL_DIR/.env" <<EOF
+# Генерируем секреты только при первой установке.
+# При повторном запуске используем существующий .env чтобы не потерять
+# пароли от уже инициализированной базы данных.
+if [[ -f "$INSTALL_DIR/.env" ]]; then
+  info "Файл .env уже существует — использую существующие секреты"
+  # Загружаем переменные из файла для отображения Grafana-пароля в итоге
+  GRAFANA_PASSWORD=$(grep '^GRAFANA_PASSWORD=' "$INSTALL_DIR/.env" | cut -d= -f2 || echo "см. $INSTALL_DIR/.env")
+  success "Существующая конфигурация загружена: $INSTALL_DIR/.env"
+else
+  info "Генерирую секреты..."
+  DB_PASSWORD=$(openssl rand -base64 32 | tr -d '/=+' | cut -c1-32)
+  REDIS_PASSWORD=$(openssl rand -base64 24 | tr -d '/=+' | cut -c1-24)
+  JWT_SECRET=$(openssl rand -base64 64 | tr -d '/=+' | cut -c1-64)
+  GRAFANA_PASSWORD=$(openssl rand -base64 20 | tr -d '/=+' | cut -c1-20)
+
+  cat > "$INSTALL_DIR/.env" <<EOF
 # AQI Platform — конфигурация
 # Создан: $(date '+%Y-%m-%d %H:%M:%S')
 # ВАЖНО: не передавайте этот файл посторонним
@@ -201,8 +210,9 @@ ALERT_ENABLED=false
 ALERT_THRESHOLD=101
 ALERT_COOLDOWN=4h
 EOF
-chmod 600 "$INSTALL_DIR/.env"
-success "Конфигурация .env создана (права 600)"
+  chmod 600 "$INSTALL_DIR/.env"
+  success "Конфигурация .env создана (права 600)"
+fi
 
 # TLS сертификат (самоподписанный для начала работы)
 if [[ ! -f "$INSTALL_DIR/docker/nginx/ssl/cert.pem" ]]; then
