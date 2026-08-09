@@ -1,7 +1,7 @@
 # ──────────────────────────────────────────────────────────────
 # Stage 1: сборка Go-бинарника
 # ──────────────────────────────────────────────────────────────
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.26-alpine AS go-builder
 
 # Устанавливаем git (нужен для go mod download с VCS)
 RUN apk add --no-cache git ca-certificates tzdata
