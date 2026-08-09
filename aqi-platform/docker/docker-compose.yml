@@ -357,9 +357,9 @@ services:
     networks:
       - aqi_internal
     healthcheck:
-      # HTTP-блок делает 301 → HTTPS, поэтому проверяем напрямую HTTPS.
-      # --no-check-certificate нужен для самоподписанного сертификата.
-      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://localhost/health || exit 1"]
+      # Проверяем HTTP-порт 80 где /health возвращает 200 напрямую (без TLS).
+      # НЕ используем HTTPS: запрос попадёт в default_server (return 444).
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

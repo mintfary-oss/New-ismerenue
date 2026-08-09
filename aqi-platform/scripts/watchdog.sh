@@ -193,10 +193,12 @@ restart_service() {
 }
 
 # ── HTTP-проверка здоровья ─────────────────────────────────────────────────────
+# -k (--insecure) нужен если BASE_URL использует HTTPS с самоподписанным сертом.
+# -L следует редиректам (HTTP → HTTPS).
 check_http_health() {
     local url="$1"
     local timeout="${2:-5}"
-    curl -sf --max-time "${timeout}" "${url}" > /dev/null 2>&1
+    curl -skLf --max-time "${timeout}" "${url}" > /dev/null 2>&1
 }
 
 # ── Проверка диска ────────────────────────────────────────────────────────────
