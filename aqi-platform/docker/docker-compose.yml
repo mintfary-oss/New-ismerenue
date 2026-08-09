@@ -203,6 +203,9 @@ services:
     <<: *base-security
     cap_drop:
       - ALL
+    cap_add:
+      - SETUID   # нужно entrypoint-скрипту Alpine для переключения на пользователя redis
+      - SETGID
     logging: *default-logging
 
   # ── Backup (pg_dump каждые 6 часов) ───────────────────────────────────────
