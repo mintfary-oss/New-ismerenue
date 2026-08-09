@@ -231,11 +231,20 @@ main() {
 
         # ── Проверяем критичные сервисы ──────────────────────────────────────
         for service in "${CRITICAL_SERVICES[@]}"; do
-            if ! check_service "${service}"; then
-                restart_service "${service}"
-            else
-                # Удаляем flag если сервис восстановился
+            svc_status=0
+            check_service "${service}" || svc_status=$?
+            if [[ "${svc_status}" -eq 0 ]]; then
+                # Сервис здоров
                 rm -f "/tmp/aqi_alert_${service}.flag"
+            elif [[ "${svc_status}" -eq 2 ]]; then
+                # Сервис запускается (health: starting) — ждём, не перезапускаем.
+                # ВАЖНО: нельзя использовать 'if ! check_service', т.к. bash '!'
+                # считает любой ненулевой код (в т.ч. 2) за ошибку и рестартует
+                # контейнер прямо в момент прохождения healthcheck.
+                : # no-op
+            else
+                # Сервис нездоров или упал — перезапускаем
+                restart_service "${service}"
             fi
         done
 
