@@ -230,13 +230,13 @@ services:
       - backup_data:/backups
       - ../scripts/backup.sh:/scripts/backup.sh:ro
     # Бесконечный цикл: ждём 6 часов, запускаем бэкап, повторяем.
-    # ВАЖНО: while-тело на одной строке — YAML '>' схлопывает переносы в пробелы,
-    # поэтому sleep и команда разделяются '&&', а не переносом строки.
+    # Используем 'bash /scripts/backup.sh' вместо прямого вызова — это обходит
+    # проблему: chmod +x на :ro-монтировании завершается ошибкой EROFS.
+    # YAML '>': while-тело на одной строке, иначе переносы схлопнутся в пробелы.
     command: >
       sh -c "
-        chmod +x /scripts/backup.sh &&
         echo 'Сервис бэкапа запущен. Расписание: каждые 6 часов' &&
-        while true; do sleep 21600 && /scripts/backup.sh >> /var/log/backup.log 2>&1 || true; done
+        while true; do sleep 21600 && bash /scripts/backup.sh >> /var/log/backup.log 2>&1 || true; done
       "
     networks:
       - aqi_internal
