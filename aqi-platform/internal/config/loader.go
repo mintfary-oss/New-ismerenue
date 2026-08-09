@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"strings"
 	"time"
 
@@ -135,9 +136,10 @@ func validate(cfg *Config) error {
 	return nil
 }
 
-// bindEnvs явно привязывает переменные окружения к ключам Viper.
-// Это необходимо потому что AutomaticEnv() не работает с v.Unmarshal()
-// для вложенных ключей: без BindEnv значения из ENV не попадают в структуру.
+// bindEnvs читает переменные окружения через os.Getenv и передаёт их в Viper
+// через v.Set(). Это надёжнее чем BindEnv+AutomaticEnv: v.Set() имеет
+// наивысший приоритет и всегда попадает в результат v.Unmarshal(),
+// тогда как BindEnv не работает для ключей без default-значения в AllKeys().
 func bindEnvs(v *viper.Viper) {
 	pairs := [][2]string{
 		// Server
@@ -191,6 +193,8 @@ func bindEnvs(v *viper.Viper) {
 		{"log.format", "AQI_LOG_FORMAT"},
 	}
 	for _, p := range pairs {
-		_ = v.BindEnv(p[0], p[1])
+		if val := os.Getenv(p[1]); val != "" {
+			v.Set(p[0], val)
+		}
 	}
 }
