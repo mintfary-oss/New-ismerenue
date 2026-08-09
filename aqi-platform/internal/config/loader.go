@@ -27,6 +27,11 @@ func Load(path string) (*Config, error) {
 	// Значения по умолчанию.
 	setDefaults(v)
 
+	// Явная привязка переменных окружения.
+	// AutomaticEnv() не работает с Unmarshal для вложенных ключей — BindEnv
+	// обязателен чтобы переменные окружения попали в структуру Config.
+	bindEnvs(v)
+
 	// Чтение файла (не обязательно — ENV достаточно).
 	// При использовании SetConfigFile() Viper возвращает *os.PathError (не
 	// ConfigFileNotFoundError) когда файл отсутствует — проверяем оба случая.
@@ -128,4 +133,64 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("server.port должен быть в диапазоне 1-65535")
 	}
 	return nil
+}
+
+// bindEnvs явно привязывает переменные окружения к ключам Viper.
+// Это необходимо потому что AutomaticEnv() не работает с v.Unmarshal()
+// для вложенных ключей: без BindEnv значения из ENV не попадают в структуру.
+func bindEnvs(v *viper.Viper) {
+	pairs := [][2]string{
+		// Server
+		{"server.host", "AQI_SERVER_HOST"},
+		{"server.port", "AQI_SERVER_PORT"},
+		{"server.base_url", "AQI_SERVER_BASE_URL"},
+		{"server.read_timeout", "AQI_SERVER_READ_TIMEOUT"},
+		{"server.write_timeout", "AQI_SERVER_WRITE_TIMEOUT"},
+		{"server.idle_timeout", "AQI_SERVER_IDLE_TIMEOUT"},
+		// Database
+		{"database.host", "AQI_DATABASE_HOST"},
+		{"database.port", "AQI_DATABASE_PORT"},
+		{"database.name", "AQI_DATABASE_NAME"},
+		{"database.user", "AQI_DATABASE_USER"},
+		{"database.password", "AQI_DATABASE_PASSWORD"},
+		{"database.ssl_mode", "AQI_DATABASE_SSL_MODE"},
+		{"database.max_open_conns", "AQI_DATABASE_MAX_OPEN_CONNS"},
+		{"database.max_idle_conns", "AQI_DATABASE_MAX_IDLE_CONNS"},
+		{"database.conn_max_lifetime", "AQI_DATABASE_CONN_MAX_LIFETIME"},
+		{"database.migrations_path", "AQI_DATABASE_MIGRATIONS_PATH"},
+		// Redis
+		{"redis.addr", "AQI_REDIS_ADDR"},
+		{"redis.password", "AQI_REDIS_PASSWORD"},
+		{"redis.db", "AQI_REDIS_DB"},
+		{"redis.token_blacklist_ttl", "AQI_REDIS_TOKEN_BLACKLIST_TTL"},
+		// Auth
+		{"auth.jwt_secret", "AQI_AUTH_JWT_SECRET"},
+		{"auth.access_token_ttl", "AQI_AUTH_ACCESS_TOKEN_TTL"},
+		{"auth.refresh_token_ttl", "AQI_AUTH_REFRESH_TOKEN_TTL"},
+		{"auth.password_reset_ttl", "AQI_AUTH_PASSWORD_RESET_TTL"},
+		{"auth.max_login_attempts", "AQI_AUTH_MAX_LOGIN_ATTEMPTS"},
+		{"auth.lockout_duration", "AQI_AUTH_LOCKOUT_DURATION"},
+		// Email
+		{"email.imap_host", "AQI_EMAIL_IMAP_HOST"},
+		{"email.imap_port", "AQI_EMAIL_IMAP_PORT"},
+		{"email.imap_user", "AQI_EMAIL_IMAP_USER"},
+		{"email.imap_password", "AQI_EMAIL_IMAP_PASSWORD"},
+		{"email.poll_interval", "AQI_EMAIL_POLL_INTERVAL"},
+		{"email.smtp_host", "AQI_EMAIL_SMTP_HOST"},
+		{"email.smtp_port", "AQI_EMAIL_SMTP_PORT"},
+		{"email.smtp_user", "AQI_EMAIL_SMTP_USER"},
+		{"email.smtp_pass", "AQI_EMAIL_SMTP_PASS"},
+		{"email.from_addr", "AQI_EMAIL_FROM_ADDR"},
+		// Alert
+		{"alert.enabled", "AQI_ALERT_ENABLED"},
+		{"alert.threshold", "AQI_ALERT_THRESHOLD"},
+		{"alert.cooldown_duration", "AQI_ALERT_COOLDOWN_DURATION"},
+		{"alert.check_interval", "AQI_ALERT_CHECK_INTERVAL"},
+		// Log
+		{"log.level", "AQI_LOG_LEVEL"},
+		{"log.format", "AQI_LOG_FORMAT"},
+	}
+	for _, p := range pairs {
+		_ = v.BindEnv(p[0], p[1])
+	}
 }
