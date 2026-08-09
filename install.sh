@@ -112,6 +112,49 @@ fi
 COMPOSE_VER=$(docker compose version --short 2>/dev/null || echo "?")
 success "Docker Compose $COMPOSE_VER доступен"
 
+# ── Вспомогательная функция: освободить порт ─────────────────────────────────
+# Останавливает любой процесс (в т.ч. системный nginx/apache), занимающий PORT.
+# Docker-proxy нашего проекта не трогаем — compose сам его пересоздаст.
+free_port() {
+  local PORT=$1
+
+  # Собираем PID-ы через ss (iproute2) или lsof как запасной вариант
+  local PIDS
+  PIDS=$(ss -tlnp "sport = :${PORT}" 2>/dev/null \
+           | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u || true)
+  [[ -z "$PIDS" ]] && \
+    PIDS=$(lsof -ti ":${PORT}" 2>/dev/null || true)
+
+  [[ -z "$PIDS" ]] && return 0   # порт свободен
+
+  for PID in $PIDS; do
+    [[ -z "$PID" || ! "$PID" =~ ^[0-9]+$ ]] && continue
+
+    local PROC
+    PROC=$(ps -p "$PID" -o comm= 2>/dev/null || echo "unknown")
+
+    # Docker-proxy нашего compose-проекта — пропускаем, он будет пересоздан
+    [[ "$PROC" == "docker-proxy" ]] && continue
+
+    warn "Порт ${PORT} занят: $PROC (PID $PID)"
+
+    # Системные веб-серверы — мягкая остановка через systemctl
+    case "$PROC" in
+      nginx|apache2|lighttpd|httpd|caddy)
+        systemctl stop    "$PROC" 2>/dev/null || true
+        systemctl disable "$PROC" 2>/dev/null || true
+        success "Системный $PROC остановлен и убран из автозапуска"
+        ;;
+      *)
+        kill -TERM "$PID" 2>/dev/null || true
+        sleep 1
+        kill    -9 "$PID" 2>/dev/null || true
+        success "Процесс $PROC (PID $PID) завершён"
+        ;;
+    esac
+  done
+}
+
 # ── Шаг 3: Клонирование репозитория ──────────────────────────────────────────
 step "Шаг 3/7: Получение исходного кода"
 
@@ -275,6 +318,13 @@ success "Образы собраны локально"
 # ── Шаг 6: Запуск платформы ───────────────────────────────────────────────────
 step "Шаг 6/7: Запуск"
 
+# Освобождаем порты 80 и 443 перед запуском nginx.
+# Если там системный nginx, apache2 или другой сервис — останавливаем его.
+info "Проверяю порты 80 и 443..."
+free_port 80
+free_port 443
+success "Порты 80 и 443 готовы"
+
 docker compose \
   -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
   --env-file "$INSTALL_DIR/.env" \
@@ -282,6 +332,30 @@ docker compose \
   up -d --remove-orphans
 
 success "Контейнеры запущены"
+
+# Ждём несколько секунд и проверяем nginx.
+# Если он в restart-loop — значит volume создался compose'ом, но сертификат
+# туда не попал (редкий race condition). Копируем ещё раз и рестартуем.
+info "Проверяю состояние nginx..."
+sleep 5
+NGINX_STATE=$(docker inspect --format='{{.State.Status}}' aqi_nginx 2>/dev/null || echo "missing")
+if [[ "$NGINX_STATE" == "restarting" || "$NGINX_STATE" == "exited" ]]; then
+  warn "Nginx не стартовал — копирую сертификат повторно..."
+  docker run --rm \
+    -v aqi-platform_nginx_certs:/certs \
+    -v "$INSTALL_DIR/docker/nginx/ssl:/src:ro" \
+    alpine \
+    sh -c "cp /src/cert.pem /certs/cert.pem && cp /src/key.pem /certs/key.pem && chmod 600 /certs/key.pem" \
+    2>/dev/null || true
+  docker compose \
+    -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
+    --env-file "$INSTALL_DIR/.env" \
+    --project-name aqi-platform \
+    restart nginx 2>/dev/null || true
+  success "Nginx перезапущен с сертификатом"
+else
+  success "Nginx запущен (статус: $NGINX_STATE)"
+fi
 
 # ── Шаг 7: Автозапуск и watchdog ─────────────────────────────────────────────
 step "Шаг 7/7: Автозапуск"
@@ -366,15 +440,33 @@ ALIAS_EOF
 fi
 
 # ── Ожидание готовности платформы ────────────────────────────────────────────
+# Nginx работает только по HTTPS (HTTP → 301 редирект), поэтому проверяем
+# HTTPS с флагом -k (игнорируем самоподписанный сертификат).
+# В процессе ожидания автоматически исправляем nginx, если он не стартовал.
 echo ""
-info "Ожидаю готовности сервисов (до 90 секунд)..."
+info "Ожидаю готовности сервисов (до 120 секунд)..."
 READY=false
-for i in $(seq 1 18); do
+for i in $(seq 1 24); do
   sleep 5
-  if curl -sf "http://localhost/health" >/dev/null 2>&1 || \
-     curl -sf "http://${SERVER_IP}/health" >/dev/null 2>&1; then
+  if curl -skf "https://localhost/health" >/dev/null 2>&1 || \
+     curl -skf "https://${SERVER_IP}/health" >/dev/null 2>&1; then
     READY=true
     break
+  fi
+  # Авторемонт: если nginx в restart-loop — повторяем копирование сертификата
+  NGINX_CHK=$(docker inspect --format='{{.State.Status}}' aqi_nginx 2>/dev/null || echo "missing")
+  if [[ "$NGINX_CHK" == "restarting" || "$NGINX_CHK" == "exited" ]]; then
+    docker run --rm \
+      -v aqi-platform_nginx_certs:/certs \
+      -v "$INSTALL_DIR/docker/nginx/ssl:/src:ro" \
+      alpine \
+      sh -c "cp /src/cert.pem /certs/cert.pem && cp /src/key.pem /certs/key.pem && chmod 600 /certs/key.pem" \
+      2>/dev/null || true
+    docker compose \
+      -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
+      --env-file "$INSTALL_DIR/.env" \
+      --project-name aqi-platform \
+      restart nginx 2>/dev/null || true
   fi
   echo -n "."
 done
@@ -394,12 +486,12 @@ else
 fi
 
 echo ""
-echo -e "  ${BOLD}Доступ к платформе:${NC}"
+echo -e "  ${BOLD}Доступ к платформе (нажмите «Продолжить» при предупреждении о сертификате):${NC}"
 echo -e "  ┌───────────────────────────────────────────────────────────┐"
-echo -e "  │  Платформа:  http://${SERVER_IP}/                              │"
-echo -e "  │  Grafana:    http://${SERVER_IP}/grafana/                       │"
-echo -e "  │  Swagger UI: http://${SERVER_IP}/api/v1/docs                    │"
-echo -e "  │  Виджет:     http://${SERVER_IP}/widget/                        │"
+echo -e "  │  Платформа:  https://${SERVER_IP}/                             │"
+echo -e "  │  Grafana:    https://${SERVER_IP}/grafana/                      │"
+echo -e "  │  Swagger UI: https://${SERVER_IP}/api/v1/docs                   │"
+echo -e "  │  Виджет:     https://${SERVER_IP}/widget/                       │"
 echo -e "  └───────────────────────────────────────────────────────────┘"
 echo ""
 echo -e "  ${BOLD}Учётные данные:${NC}"
@@ -420,7 +512,6 @@ echo -e "  ${BOLD}Исходный код:${NC}  ${SOURCE_DIR}"
 echo -e "  ${BOLD}Логи watchdog:${NC} /var/log/aqi-watchdog.log"
 echo ""
 echo -e "  ${BOLD}Следующие шаги:${NC}"
-echo -e "  1. Откройте http://${SERVER_IP}/ и создайте учётную запись администратора"
+echo -e "  1. Откройте https://${SERVER_IP}/ и создайте учётную запись администратора"
 echo -e "  2. Добавьте датчики в разделе Настройки → Датчики"
-echo -e "  3. Для HTTPS: sudo bash ${INSTALL_DIR}/scripts/setup-tls.sh"
 echo ""
