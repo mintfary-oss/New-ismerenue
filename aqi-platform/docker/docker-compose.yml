@@ -357,9 +357,9 @@ services:
     networks:
       - aqi_internal
     healthcheck:
-      # Проверяем HTTP-порт 80 где /health возвращает 200 напрямую (без TLS).
-      # НЕ используем HTTPS: запрос попадёт в default_server (return 444).
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      # 127.0.0.1 вместо localhost: BusyBox wget в Alpine резолвит localhost
+      # в ::1 (IPv6), но nginx слушает только 0.0.0.0:80 (IPv4) → refused.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
