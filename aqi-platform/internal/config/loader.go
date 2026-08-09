@@ -3,7 +3,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 	"time"
 
@@ -26,9 +28,12 @@ func Load(path string) (*Config, error) {
 	setDefaults(v)
 
 	// Чтение файла (не обязательно — ENV достаточно).
+	// При использовании SetConfigFile() Viper возвращает *os.PathError (не
+	// ConfigFileNotFoundError) когда файл отсутствует — проверяем оба случая.
 	if err := v.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			// Файл найден, но содержит ошибку.
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) && !errors.Is(err, fs.ErrNotExist) {
+			// Файл найден, но содержит ошибку синтаксиса.
 			return nil, fmt.Errorf("чтение конфигурации: %w", err)
 		}
 		// Файл не найден — продолжаем с ENV и дефолтами.
