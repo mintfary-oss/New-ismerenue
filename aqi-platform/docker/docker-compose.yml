@@ -229,18 +229,14 @@ services:
     volumes:
       - backup_data:/backups
       - ../scripts/backup.sh:/scripts/backup.sh:ro
-    # Бесконечный цикл: первый бэкап через 6 ч, затем каждые 6 ч.
-    # crond не используется: в postgres:17-alpine директория crontabs отсутствует,
-    # из-за чего `crontab -` завершается с ошибкой и контейнер падает.
+    # Бесконечный цикл: ждём 6 часов, запускаем бэкап, повторяем.
+    # ВАЖНО: while-тело на одной строке — YAML '>' схлопывает переносы в пробелы,
+    # поэтому sleep и команда разделяются '&&', а не переносом строки.
     command: >
       sh -c "
         chmod +x /scripts/backup.sh &&
         echo 'Сервис бэкапа запущен. Расписание: каждые 6 часов' &&
-        while true; do
-          sleep 21600
-          /scripts/backup.sh >> /var/log/backup.log 2>&1 ||
-            echo \"[ERROR $(date '+%Y-%m-%d %H:%M:%S')] backup.sh завершился с ошибкой\" >> /var/log/backup.log
-        done
+        while true; do sleep 21600 && /scripts/backup.sh >> /var/log/backup.log 2>&1 || true; done
       "
     networks:
       - aqi_internal
