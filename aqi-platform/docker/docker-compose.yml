@@ -262,6 +262,7 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
       - '--web.external-url=${BASE_URL:-http://localhost}/prometheus/'
+      - '--web.route-prefix=/'  # маршруты на корне, external-url только для ссылок
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
