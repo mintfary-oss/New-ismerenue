@@ -158,6 +158,18 @@ if [[ -f "$INSTALL_DIR/.env" ]]; then
   GRAFANA_PASSWORD=$(grep '^GRAFANA_PASSWORD=' "$INSTALL_DIR/.env" | cut -d= -f2 || echo "см. $INSTALL_DIR/.env")
   success "Существующая конфигурация загружена: $INSTALL_DIR/.env"
 else
+  # Свежие секреты — если PostgreSQL-том уже существует от старой установки,
+  # его пароль не совпадёт с новыми секретами. Сбрасываем тома автоматически.
+  EXISTING_PG_VOLUME=$(docker volume ls -q --filter "name=aqi-platform_postgres_data" 2>/dev/null || true)
+  if [[ -n "$EXISTING_PG_VOLUME" ]]; then
+    warn "Обнаружен PostgreSQL-том от старой установки — сбрасываю тома для синхронизации паролей..."
+    docker compose \
+      -f "$SOURCE_DIR/aqi-platform/docker/docker-compose.yml" \
+      --project-name aqi-platform \
+      down -v 2>/dev/null || true
+    success "Старые тома удалены — PostgreSQL запустится с новыми паролями"
+  fi
+
   info "Генерирую секреты..."
   DB_PASSWORD=$(openssl rand -base64 32 | tr -d '/=+' | cut -c1-32)
   REDIS_PASSWORD=$(openssl rand -base64 24 | tr -d '/=+' | cut -c1-24)
