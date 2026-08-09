@@ -3,8 +3,9 @@
 # ──────────────────────────────────────────────────────────────
 FROM golang:1.26-alpine AS go-builder
 
-# Устанавливаем git (нужен для go mod download с VCS)
-RUN apk add --no-cache git ca-certificates tzdata
+# Переключаем Alpine на Яндекс-зеркало (dl-cdn.alpinelinux.org недоступен из РФ)
+RUN sed -i 's|dl-cdn.alpinelinux.org/alpine|mirror.yandex.ru/mirrors/alpine|g' /etc/apk/repositories \
+    && apk add --no-cache git ca-certificates tzdata
 
 # Используем китайский/российский прокси для Go-модулей (proxy.golang.org недоступен из РФ)
 ENV GOPROXY=https://goproxy.cn,https://goproxy.io,direct
@@ -45,8 +46,10 @@ RUN CGO_ENABLED=0 GOOS=linux \
 # ──────────────────────────────────────────────────────────────
 FROM alpine:3.20
 
+# Переключаем Alpine на Яндекс-зеркало (dl-cdn.alpinelinux.org недоступен из РФ)
 # Устанавливаем минимальные зависимости + CA-сертификаты для HTTPS-вызовов
-RUN apk add --no-cache ca-certificates tzdata wget \
+RUN sed -i 's|dl-cdn.alpinelinux.org/alpine|mirror.yandex.ru/mirrors/alpine|g' /etc/apk/repositories \
+    && apk add --no-cache ca-certificates tzdata wget \
     && addgroup -S appgroup \
     && adduser -S appuser -G appgroup
 
