@@ -229,13 +229,18 @@ services:
     volumes:
       - backup_data:/backups
       - ../scripts/backup.sh:/scripts/backup.sh:ro
-    # Запускаем crond (Alpine): каждые 6 часов в 02:00, 08:00, 14:00, 20:00
+    # Бесконечный цикл: первый бэкап через 6 ч, затем каждые 6 ч.
+    # crond не используется: в postgres:17-alpine директория crontabs отсутствует,
+    # из-за чего `crontab -` завершается с ошибкой и контейнер падает.
     command: >
       sh -c "
         chmod +x /scripts/backup.sh &&
-        echo '0 2,8,14,20 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1' | crontab - &&
         echo 'Сервис бэкапа запущен. Расписание: каждые 6 часов' &&
-        crond -f -d 8
+        while true; do
+          sleep 21600
+          /scripts/backup.sh >> /var/log/backup.log 2>&1 ||
+            echo \"[ERROR $(date '+%Y-%m-%d %H:%M:%S')] backup.sh завершился с ошибкой\" >> /var/log/backup.log
+        done
       "
     networks:
       - aqi_internal
@@ -356,7 +361,9 @@ services:
     networks:
       - aqi_internal
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      # HTTP-блок делает 301 → HTTPS, поэтому проверяем напрямую HTTPS.
+      # --no-check-certificate нужен для самоподписанного сертификата.
+      test: ["CMD-SHELL", "wget -qO- --no-check-certificate https://localhost/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -239,6 +239,18 @@ if [[ ! -f "$INSTALL_DIR/docker/nginx/ssl/cert.pem" ]]; then
   success "TLS-сертификат создан (действителен 365 дней)"
 fi
 
+# Копируем TLS-сертификат в Docker volume nginx_certs.
+# Делаем это ДО запуска compose, чтобы Nginx нашёл сертификаты при старте.
+# Операция идемпотентна: безопасно перезапускать при повторных установках.
+info "Синхронизирую TLS-сертификат с Docker volume nginx_certs..."
+docker volume create aqi-platform_nginx_certs 2>/dev/null || true
+docker run --rm \
+  -v aqi-platform_nginx_certs:/certs \
+  -v "$INSTALL_DIR/docker/nginx/ssl:/src:ro" \
+  alpine:3.20 \
+  sh -c "cp /src/cert.pem /certs/cert.pem && cp /src/key.pem /certs/key.pem && chmod 600 /certs/key.pem"
+success "TLS-сертификат скопирован в volume nginx_certs"
+
 # ── Шаг 5: Сборка образов из исходников ──────────────────────────────────────
 step "Шаг 5/7: Сборка приложения (займёт 5–15 минут)"
 info "Собираю Go-бэкенд и React-фронтенд из исходного кода..."
