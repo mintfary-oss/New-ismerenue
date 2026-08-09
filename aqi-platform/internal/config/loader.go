@@ -50,6 +50,11 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("разбор конфигурации: %w", err)
 	}
 
+	// Viper v1.x не всегда корректно передаёт env vars в Unmarshal для
+	// вложенных ключей без default-значений. Читаем критичные переменные
+	// напрямую через os.Getenv — это надёжнее любого механизма Viper.
+	applyEnvOverrides(&cfg)
+
 	// Простая валидация критичных полей.
 	if err := validate(&cfg); err != nil {
 		return nil, fmt.Errorf("конфигурация невалидна: %w", err)
@@ -134,6 +139,78 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("server.port должен быть в диапазоне 1-65535")
 	}
 	return nil
+}
+
+// applyEnvOverrides напрямую читает переменные окружения в структуру Config.
+// Это гарантированный обходной путь для Viper v1.x: после v.Unmarshal
+// некоторые вложенные поля без default-значений могут остаться пустыми.
+func applyEnvOverrides(cfg *Config) {
+	// Server
+	if v := os.Getenv("AQI_SERVER_HOST"); v != "" {
+		cfg.Server.Host = v
+	}
+	if v := os.Getenv("AQI_SERVER_BASE_URL"); v != "" {
+		cfg.Server.BaseURL = v
+	}
+	// Database
+	if v := os.Getenv("AQI_DATABASE_HOST"); v != "" {
+		cfg.Database.Host = v
+	}
+	if v := os.Getenv("AQI_DATABASE_NAME"); v != "" {
+		cfg.Database.Name = v
+	}
+	if v := os.Getenv("AQI_DATABASE_USER"); v != "" {
+		cfg.Database.User = v
+	}
+	if v := os.Getenv("AQI_DATABASE_PASSWORD"); v != "" {
+		cfg.Database.Password = v
+	}
+	if v := os.Getenv("AQI_DATABASE_SSL_MODE"); v != "" {
+		cfg.Database.SSLMode = v
+	}
+	if v := os.Getenv("AQI_DATABASE_MIGRATIONS_PATH"); v != "" {
+		cfg.Database.MigrationsPath = v
+	}
+	// Redis
+	if v := os.Getenv("AQI_REDIS_ADDR"); v != "" {
+		cfg.Redis.Addr = v
+	}
+	if v := os.Getenv("AQI_REDIS_PASSWORD"); v != "" {
+		cfg.Redis.Password = v
+	}
+	// Auth
+	if v := os.Getenv("AQI_AUTH_JWT_SECRET"); v != "" {
+		cfg.Auth.JWTSecret = v
+	}
+	// Email
+	if v := os.Getenv("AQI_EMAIL_IMAP_HOST"); v != "" {
+		cfg.Email.IMAPHost = v
+	}
+	if v := os.Getenv("AQI_EMAIL_IMAP_USER"); v != "" {
+		cfg.Email.IMAPUser = v
+	}
+	if v := os.Getenv("AQI_EMAIL_IMAP_PASSWORD"); v != "" {
+		cfg.Email.IMAPPassword = v
+	}
+	if v := os.Getenv("AQI_EMAIL_SMTP_HOST"); v != "" {
+		cfg.Email.SMTPHost = v
+	}
+	if v := os.Getenv("AQI_EMAIL_SMTP_USER"); v != "" {
+		cfg.Email.SMTPUser = v
+	}
+	if v := os.Getenv("AQI_EMAIL_SMTP_PASS"); v != "" {
+		cfg.Email.SMTPPass = v
+	}
+	if v := os.Getenv("AQI_EMAIL_FROM_ADDR"); v != "" {
+		cfg.Email.FromAddr = v
+	}
+	// Log
+	if v := os.Getenv("AQI_LOG_LEVEL"); v != "" {
+		cfg.Log.Level = v
+	}
+	if v := os.Getenv("AQI_LOG_FORMAT"); v != "" {
+		cfg.Log.Format = v
+	}
 }
 
 // bindEnvs читает переменные окружения через os.Getenv и передаёт их в Viper
