@@ -17,6 +17,7 @@ set -euo pipefail
 [[ $EUID -ne 0 ]] && { echo "Запустите от root: sudo bash $0"; exit 1; }
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/aqi-platform}"
+SOURCE_DIR="${SOURCE_DIR:-/opt/aqi-source}"
 
 echo "Устанавливаю systemd сервисы..."
 
@@ -32,25 +33,25 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=${INSTALL_DIR}
+WorkingDirectory=${SOURCE_DIR}/aqi-platform
 
 # Запуск всей платформы
 ExecStartPre=/usr/bin/docker compose \\
-  -f ${INSTALL_DIR}/docker/docker-compose.yml \\
+  -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml \\
   --env-file ${INSTALL_DIR}/.env \\
-  --project-directory ${INSTALL_DIR} \\
+  --project-name aqi-platform \\
   pull --quiet
 ExecStart=/usr/bin/docker compose \\
-  -f ${INSTALL_DIR}/docker/docker-compose.yml \\
+  -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml \\
   --env-file ${INSTALL_DIR}/.env \\
-  --project-directory ${INSTALL_DIR} \\
+  --project-name aqi-platform \\
   up -d --remove-orphans
 
 # Остановка
 ExecStop=/usr/bin/docker compose \\
-  -f ${INSTALL_DIR}/docker/docker-compose.yml \\
+  -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml \\
   --env-file ${INSTALL_DIR}/.env \\
-  --project-directory ${INSTALL_DIR} \\
+  --project-name aqi-platform \\
   down
 
 # Перезапуск при сбое
@@ -72,16 +73,16 @@ Requires=aqi-platform.service
 
 [Service]
 Type=simple
-ExecStart=/bin/bash ${INSTALL_DIR}/scripts/watchdog.sh
+ExecStart=/bin/bash ${SOURCE_DIR}/aqi-platform/scripts/watchdog.sh
 Restart=always
 RestartSec=10s
 StandardOutput=append:/var/log/aqi-watchdog.log
 StandardError=append:/var/log/aqi-watchdog.log
 
 # Переменные окружения
-Environment="COMPOSE_FILE=${INSTALL_DIR}/docker/docker-compose.yml"
+Environment="COMPOSE_FILE=${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml"
 Environment="ENV_FILE=${INSTALL_DIR}/.env"
-Environment="PROJECT_DIR=${INSTALL_DIR}"
+Environment="PROJECT_DIR=${SOURCE_DIR}/aqi-platform"
 Environment="LOG_FILE=/var/log/aqi-watchdog.log"
 Environment="CHECK_INTERVAL=30"
 Environment="MAX_RESTART_ATTEMPTS=3"
@@ -99,10 +100,10 @@ After=aqi-platform.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash ${INSTALL_DIR}/scripts/healthcheck.sh
+ExecStart=/bin/bash ${SOURCE_DIR}/aqi-platform/scripts/healthcheck.sh
 StandardOutput=append:/var/log/aqi-healthcheck.log
 StandardError=append:/var/log/aqi-healthcheck.log
-Environment="COMPOSE_FILE=${INSTALL_DIR}/docker/docker-compose.yml"
+Environment="COMPOSE_FILE=${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml"
 Environment="ENV_FILE=${INSTALL_DIR}/.env"
 EOF
 

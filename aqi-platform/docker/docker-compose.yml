@@ -302,7 +302,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED:       "false"  # анонимный доступ запрещён
       GF_SERVER_ROOT_URL:              "${BASE_URL:-http://localhost}/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH:   "true"
-      GF_SECURITY_COOKIE_SECURE:       "true"   # HTTPS-only cookies
+      GF_SECURITY_COOKIE_SECURE:       "false"  # false = работает по HTTP; установить "true" только с Let's Encrypt
       GF_SECURITY_COOKIE_SAMESITE:     "strict"
       GF_SECURITY_STRICT_TRANSPORT_SECURITY: "true"
       GF_SECURITY_X_CONTENT_TYPE_OPTIONS: "true"
@@ -363,7 +363,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 15s  # увеличено с 5s: даём nginx время инициализировать SSL и workers
     deploy:
       resources:
         limits:
