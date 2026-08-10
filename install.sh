@@ -271,15 +271,18 @@ fi
 
 # TLS сертификат (самоподписанный для начала работы)
 if [[ ! -f "$INSTALL_DIR/docker/nginx/ssl/cert.pem" ]]; then
-  info "Создаю самоподписанный TLS-сертификат..."
+  info "Создаю самоподписанный TLS-сертификат с SAN (subjectAltName)..."
+  # -addext "subjectAltName=IP:..." обязателен для Chrome 58+ и мобильных браузеров:
+  # без SAN TLS-рукопожатие отклоняется молча → ERR_CONNECTION_ABORTED (без кнопки обхода).
   openssl req -x509 -nodes -newkey rsa:4096 \
     -keyout "$INSTALL_DIR/docker/nginx/ssl/key.pem" \
     -out    "$INSTALL_DIR/docker/nginx/ssl/cert.pem" \
     -days   365 \
     -subj   "/CN=${SERVER_IP}/O=AQI Platform/C=RU" \
+    -addext "subjectAltName=IP:${SERVER_IP},DNS:localhost" \
     2>/dev/null
   chmod 600 "$INSTALL_DIR/docker/nginx/ssl/key.pem"
-  success "TLS-сертификат создан (действителен 365 дней)"
+  success "TLS-сертификат создан (действителен 365 дней, SAN=IP:${SERVER_IP})"
 fi
 
 # Копируем TLS-сертификат в Docker volume nginx_certs.
@@ -445,11 +448,13 @@ fi
 # В процессе ожидания автоматически исправляем nginx, если он не стартовал.
 echo ""
 info "Ожидаю готовности сервисов (до 120 секунд)..."
+# Проверяем HTTP (порт 80) — основная точка входа при самоподписанном сертификате.
+# Nginx теперь отдаёт контент напрямую по HTTP без редиректа на HTTPS.
 READY=false
 for i in $(seq 1 24); do
   sleep 5
-  if curl -skf "https://localhost/health" >/dev/null 2>&1 || \
-     curl -skf "https://${SERVER_IP}/health" >/dev/null 2>&1; then
+  if curl -sf "http://localhost/health" >/dev/null 2>&1 || \
+     curl -sf "http://${SERVER_IP}/health" >/dev/null 2>&1; then
     READY=true
     break
   fi
@@ -486,12 +491,13 @@ else
 fi
 
 echo ""
-echo -e "  ${BOLD}Доступ к платформе (нажмите «Продолжить» при предупреждении о сертификате):${NC}"
+echo -e "  ${BOLD}Доступ к платформе:${NC}"
 echo -e "  ┌───────────────────────────────────────────────────────────┐"
-echo -e "  │  Платформа:  https://${SERVER_IP}/                             │"
-echo -e "  │  Grafana:    https://${SERVER_IP}/grafana/                      │"
-echo -e "  │  Swagger UI: https://${SERVER_IP}/api/v1/docs                   │"
-echo -e "  │  Виджет:     https://${SERVER_IP}/widget/                       │"
+echo -e "  │  Платформа:  http://${SERVER_IP}/                              │"
+echo -e "  │  Grafana:    http://${SERVER_IP}/grafana/                       │"
+echo -e "  │  Swagger UI: http://${SERVER_IP}/api/v1/docs                    │"
+echo -e "  │  Виджет:     http://${SERVER_IP}/widget/                        │"
+echo -e "  │  (HTTPS):    https://${SERVER_IP}/  — нажмите «Дополнительно»   │"
 echo -e "  └───────────────────────────────────────────────────────────┘"
 echo ""
 echo -e "  ${BOLD}Учётные данные:${NC}"
@@ -512,6 +518,7 @@ echo -e "  ${BOLD}Исходный код:${NC}  ${SOURCE_DIR}"
 echo -e "  ${BOLD}Логи watchdog:${NC} /var/log/aqi-watchdog.log"
 echo ""
 echo -e "  ${BOLD}Следующие шаги:${NC}"
-echo -e "  1. Откройте https://${SERVER_IP}/ и создайте учётную запись администратора"
-echo -e "  2. Добавьте датчики в разделе Настройки → Датчики"
+echo -e "  1. Откройте http://${SERVER_IP}/ в браузере — никаких предупреждений о сертификате"
+echo -e "  2. Создайте учётную запись администратора"
+echo -e "  3. Добавьте датчики в разделе Настройки → Датчики"
 echo ""
