@@ -340,12 +340,15 @@ services:
     restart: always
     stop_grace_period: 15s
     depends_on:
+      # Nginx ждёт только app (API) и frontend (статика).
+      # Grafana/Prometheus НЕ являются обязательными для старта nginx:
+      # /grafana/ и /prometheus/ вернут 502 пока те не готовы — это штатно.
+      # Без этого nginx ждал бы всю цепочку postgres→redis→app→prometheus→grafana (3-5 минут),
+      # и если prometheus/grafana зависали — nginx не стартовал вообще.
       app:
         condition: service_healthy
       frontend:
         condition: service_completed_successfully
-      grafana:
-        condition: service_healthy
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"

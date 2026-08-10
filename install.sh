@@ -112,6 +112,27 @@ fi
 COMPOSE_VER=$(docker compose version --short 2>/dev/null || echo "?")
 success "Docker Compose $COMPOSE_VER доступен"
 
+# ── UFW: отключаем для корректной работы Docker networking ───────────────────
+# UFW (Uncomplicated Firewall) переопределяет iptables FORWARD chain и
+# блокирует межконтейнерный трафик Docker — контейнеры не могут достучаться
+# друг до друга, nginx получает вечный timeout на proxy_pass к app:8080.
+# После отключения UFW Docker пересоздаёт свои правила iptables при перезапуске.
+if command -v ufw &>/dev/null; then
+  UFW_STATUS=$(ufw status 2>/dev/null | head -1 || echo "inactive")
+  if echo "$UFW_STATUS" | grep -qi "active"; then
+    warn "UFW активен — отключаю (UFW несовместим с Docker networking)"
+    ufw disable
+    success "UFW отключён"
+    # Перезапускаем Docker daemon чтобы он пересоздал правила iptables без UFW
+    info "Перезапускаю Docker для обновления iptables..."
+    systemctl restart docker
+    sleep 12
+    success "Docker перезапущен с чистыми iptables"
+  else
+    info "UFW неактивен — Docker networking в порядке"
+  fi
+fi
+
 # ── Вспомогательная функция: освободить порт ─────────────────────────────────
 # Останавливает любой процесс (в т.ч. системный nginx/apache), занимающий PORT.
 # Docker-proxy нашего проекта не трогаем — compose сам его пересоздаст.
