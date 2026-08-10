@@ -36,11 +36,8 @@ RemainAfterExit=yes
 WorkingDirectory=${SOURCE_DIR}/aqi-platform
 
 # Запуск всей платформы
-ExecStartPre=/usr/bin/docker compose \\
-  -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml \\
-  --env-file ${INSTALL_DIR}/.env \\
-  --project-name aqi-platform \\
-  pull --quiet
+# ВАЖНО: docker compose pull убран — образ aqi-platform:local собирается локально
+# и недоступен в DockerHub. Pull падал бы при каждой загрузке сервера.
 ExecStart=/usr/bin/docker compose \\
   -f ${SOURCE_DIR}/aqi-platform/docker/docker-compose.yml \\
   --env-file ${INSTALL_DIR}/.env \\
