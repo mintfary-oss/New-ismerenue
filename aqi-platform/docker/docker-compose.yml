@@ -180,9 +180,9 @@ services:
     command: >
       sh -c "
         chmod 777 /data 2>/dev/null || true &&
-        find /data -maxdepth 1 -exec chmod a+rw '{}' + 2>/dev/null || true &&
+        rm -rf /data/appendonlydir &&
         chown -R 999:999 /data 2>/dev/null || true &&
-        echo 'Redis volume permissions fixed'
+        echo 'Redis volume ready'
       "
     restart: "no"
     <<: *base-security
@@ -202,9 +202,9 @@ services:
         --requirepass "${REDIS_PASSWORD}"
         --maxmemory 128mb
         --maxmemory-policy allkeys-lru
-        --save 300 100
-        --appendonly yes
-        --appendfsync everysec
+        --save 300 1
+        --save 60 100
+        --appendonly no
         --protected-mode yes
         --bind 0.0.0.0
         --loglevel notice
