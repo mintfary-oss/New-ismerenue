@@ -35,6 +35,11 @@ Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${SOURCE_DIR}/aqi-platform
 
+# Исправление прав Redis volume перед запуском.
+# После аварийной остановки сервера appendonlydir может получить права root:root,
+# что блокирует старт Redis (процесс работает под UID 999).
+ExecStartPre=/bin/bash -c "docker run --rm -v aqi-platform_redis_data:/data alpine sh -c 'chmod 777 /data && chown -R 999:999 /data' 2>/dev/null || true"
+
 # Запуск всей платформы
 # ВАЖНО: docker compose pull убран — образ aqi-platform:local собирается локально
 # и недоступен в DockerHub. Pull падал бы при каждой загрузке сервера.
