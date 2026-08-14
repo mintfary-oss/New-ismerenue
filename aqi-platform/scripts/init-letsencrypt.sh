@@ -2,21 +2,24 @@
 # =============================================================================
 # init-letsencrypt.sh — первичный выпуск сертификата Let's Encrypt
 #
-# Запустить один раз после деплоя:
+# Запустить один раз после первого деплоя:
 #   bash /opt/aqi-source/aqi-platform/scripts/init-letsencrypt.sh
 #
 # Что делает:
-#   1. Создаёт временный самоподписанный сертификат чтобы nginx мог стартовать
-#   2. Запускает nginx (если не запущен)
-#   3. Получает реальный сертификат от Let's Encrypt через webroot-challenge
-#   4. Перезапускает nginx с реальным сертификатом
+#   1. Убеждается что платформа запущена (docker compose up -d)
+#   2. Получает реальный сертификат от Let's Encrypt через webroot-challenge
+#   3. Перезапускает nginx с реальным сертификатом
+#
+# При следующих запусках docker compose — nginx-init автоматически создаёт
+# самоподписанный сертификат если Let's Encrypt ещё недоступен,
+# поэтому nginx всегда стартует без ошибок.
 # =============================================================================
 
 set -euo pipefail
 
 DOMAIN="217-198-12-184.sslip.io"
 EMAIL="${LETSENCRYPT_EMAIL:-admin@${DOMAIN}}"
-STAGING="${LETSENCRYPT_STAGING:-0}"   # 1 = тест без лимитов, 0 = боевой
+STAGING="${LETSENCRYPT_STAGING:-0}"   # 1 = тест без лимитов LE, 0 = боевой
 
 COMPOSE_FILE="${SOURCE_DIR:-/opt/aqi-source}/aqi-platform/docker/docker-compose.yml"
 ENV_FILE="${INSTALL_DIR:-/opt/aqi-platform}/.env"
@@ -32,40 +35,14 @@ die()  { echo -e "${RED}[ERR]${NC}  $*" >&2; exit 1; }
 [[ $EUID -ne 0 ]] && die "Запустите от root: sudo bash $0"
 command -v docker >/dev/null || die "Docker не установлен"
 
-# ── 1. Временный сертификат (чтобы nginx смог стартовать) ─────────────────
-log "Создаю временный сертификат для ${DOMAIN}..."
-docker run --rm \
-  -v "${PROJECT}_certbot_data:/etc/letsencrypt" \
-  --entrypoint "" \
-  certbot/certbot sh -c "
-    mkdir -p /etc/letsencrypt/live/${DOMAIN}
-    openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
-      -keyout /etc/letsencrypt/live/${DOMAIN}/privkey.pem \
-      -out    /etc/letsencrypt/live/${DOMAIN}/fullchain.pem \
-      -subj   '/CN=localhost' 2>/dev/null
-    # chain.pem нужен nginx для ssl_trusted_certificate (опционально)
-    cp /etc/letsencrypt/live/${DOMAIN}/fullchain.pem \
-       /etc/letsencrypt/live/${DOMAIN}/chain.pem
-  "
-ok "Временный сертификат создан"
-
-# ── 2. Запуск nginx ───────────────────────────────────────────────────────
-log "Запускаю nginx..."
+# ── 1. Запускаем платформу если ещё не запущена ───────────────────────────
+log "Запускаю платформу (если не запущена)..."
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" \
-  --project-name "${PROJECT}" up -d nginx
+  --project-name "${PROJECT}" up -d
 sleep 5
-ok "Nginx запущен"
+ok "Платформа запущена"
 
-# ── 3. Удаляем временный сертификат ──────────────────────────────────────
-log "Удаляю временный сертификат..."
-docker run --rm \
-  -v "${PROJECT}_certbot_data:/etc/letsencrypt" \
-  --entrypoint "" \
-  certbot/certbot rm -rf "/etc/letsencrypt/live/${DOMAIN}" \
-                          "/etc/letsencrypt/archive/${DOMAIN}" \
-                          "/etc/letsencrypt/renewal/${DOMAIN}.conf"
-
-# ── 4. Получаем реальный сертификат ──────────────────────────────────────
+# ── 2. Получаем реальный сертификат ──────────────────────────────────────
 log "Получаю сертификат от Let's Encrypt для ${DOMAIN}..."
 
 STAGING_FLAG=""
@@ -84,11 +61,12 @@ docker run --rm \
     --email "${EMAIL}" \
     --agree-tos \
     --no-eff-email \
+    --force-renewal \
     -d "${DOMAIN}"
 
 ok "Сертификат получен"
 
-# ── 5. Перезапуск nginx с реальным сертификатом ───────────────────────────
+# ── 3. Перезапуск nginx с реальным сертификатом ───────────────────────────
 log "Перезапускаю nginx с Let's Encrypt сертификатом..."
 docker compose -f "${COMPOSE_FILE}" --env-file "${ENV_FILE}" \
   --project-name "${PROJECT}" restart nginx
@@ -99,3 +77,4 @@ echo ""
 echo -e "${BOLD}Сайт доступен по адресу:${NC} https://${DOMAIN}"
 echo ""
 echo "Сертификат действителен 90 дней и обновляется автоматически каждые 12 часов."
+echo "Повторно запускать этот скрипт не нужно."

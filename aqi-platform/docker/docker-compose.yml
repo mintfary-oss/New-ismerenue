@@ -168,12 +168,35 @@ services:
     <<: *base-security
     logging: *default-logging
 
+  # ── Redis init (исправление прав volume перед стартом Redis) ───────────────
+  # После аварийной остановки appendonlydir может получить права root:root,
+  # что блокирует старт Redis (UID 999). Этот init-контейнер исправляет права
+  # при каждом запуске docker compose — безопасно, данные не удаляются.
+  redis-init:
+    image: alpine:3.20
+    container_name: aqi_redis_init
+    volumes:
+      - redis_data:/data
+    command: >
+      sh -c "
+        chmod 777 /data 2>/dev/null || true &&
+        find /data -maxdepth 1 -exec chmod a+rw '{}' + 2>/dev/null || true &&
+        chown -R 999:999 /data 2>/dev/null || true &&
+        echo 'Redis volume permissions fixed'
+      "
+    restart: "no"
+    <<: *base-security
+    logging: *default-logging
+
   # ── Redis ──────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: aqi_redis
     restart: always
     stop_grace_period: 10s
+    depends_on:
+      redis-init:
+        condition: service_completed_successfully
     command: >
       redis-server
         --requirepass "${REDIS_PASSWORD}"
@@ -332,6 +355,36 @@ services:
     <<: *base-security
     logging: *default-logging
 
+  # ── Nginx init (создание временного сертификата при первом запуске) ────────
+  # Если сертификат Let's Encrypt ещё не получен — создаёт самоподписанный,
+  # чтобы nginx мог стартовать. После запуска init-letsencrypt.sh этот шаг
+  # просто проверит наличие cert и завершится без изменений.
+  nginx-init:
+    image: alpine:3.20
+    container_name: aqi_nginx_init
+    volumes:
+      - certbot_data:/etc/letsencrypt
+    command: >
+      sh -c "
+        DOMAIN=217-198-12-184.sslip.io &&
+        CERT=/etc/letsencrypt/live/$$DOMAIN/fullchain.pem &&
+        if [ -f $$CERT ]; then
+          echo 'Cert already exists, skipping' && exit 0
+        fi &&
+        echo 'Creating self-signed placeholder cert...' &&
+        apk add --no-cache openssl 2>/dev/null &&
+        mkdir -p /etc/letsencrypt/live/$$DOMAIN &&
+        openssl req -x509 -nodes -newkey rsa:2048 -days 365
+          -keyout /etc/letsencrypt/live/$$DOMAIN/privkey.pem
+          -out    /etc/letsencrypt/live/$$DOMAIN/fullchain.pem
+          -subj   '/CN='$$DOMAIN
+          -addext 'subjectAltName=DNS:'$$DOMAIN 2>/dev/null &&
+        echo 'Self-signed cert created. Run init-letsencrypt.sh to get real cert.'
+      "
+    restart: "no"
+    <<: *base-security
+    logging: *default-logging
+
   # ── Certbot (получение и обновление Let's Encrypt сертификата) ────────────
   # Обновление автоматически каждые 12 часов.
   # Первичный выпуск сертификата: bash scripts/init-letsencrypt.sh
@@ -355,11 +408,13 @@ services:
     restart: always
     stop_grace_period: 15s
     depends_on:
-      # Nginx ждёт только app (API) и frontend (статика).
+      # nginx-init создаёт самоподписанный сертификат если Let's Encrypt ещё нет.
+      # После получения реального сертификата (init-letsencrypt.sh) этот шаг
+      # просто проверит наличие cert и завершится мгновенно.
+      nginx-init:
+        condition: service_completed_successfully
       # Grafana/Prometheus НЕ являются обязательными для старта nginx:
-      # /grafana/ и /prometheus/ вернут 502 пока те не готовы — это штатно.
-      # Без этого nginx ждал бы всю цепочку postgres→redis→app→prometheus→grafana (3-5 минут),
-      # и если prometheus/grafana зависали — nginx не стартовал вообще.
+      # /grafana/ вернёт 502 пока grafana не готова — это штатно.
       app:
         condition: service_healthy
       frontend:
